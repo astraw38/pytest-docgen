@@ -119,7 +119,7 @@ An RST file would be generated on test execution::
        call
           FAILED
 
-          .. code-block:: none
+          ::
 
              self = <test_precons.TestRSABounds object at 0xb4176e0c>, auth_session = 0
 
@@ -132,7 +132,7 @@ An RST file would be generated on test execution::
              E         - False
              E         + This isn't really false
 
-             CC/test_precons.py:42: AssertionError
+             test_precons.py:42: AssertionError
 ```
 
 
