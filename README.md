@@ -32,6 +32,10 @@ This will generate rst files from the tests.
 From a test file setup like this::
 
 ```python
+    """
+    This is the docstring of the Module.
+    """
+    
     @pytest.fixture(scope='class')
     def a():
         '''
@@ -60,21 +64,9 @@ From a test file setup like this::
 An RST file would be generated on test execution::
 
 ```rst
-    =====
-    Title
-    =====
-
-    Test run description. The title & this description can either be preset, or
-    pulled from pytest runtime configuration via commandline.
-
-
-    .. topic:: Session Fixtures
-
-        fixture1
-            Fixture1's documentation
-
-        fixture 2
-            Fixture2's documentation
+    .. toctree::
+       :hidden:
+       :includehidden:
 
 
     Module.path.test_sample
