@@ -3,8 +3,10 @@ Test file for preconditions & the like
 """
 import pytest
 
+from pytest_docgen.pytest_docgen import doc_result
 
 
+@doc_result
 @pytest.fixture(scope="class")
 def auth_session(request):
     """
@@ -30,7 +32,7 @@ def auth_session(request):
 
     :return: Allocated :class:`~LunaTAP.core.client.node.ClientNode`
     """
-    return 0
+    return "This is a test fixture"
 
 def test_module_level_test():
     pass

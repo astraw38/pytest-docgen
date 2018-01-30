@@ -85,7 +85,9 @@ class NodeDocCollector(object):
         rst.newline()
 
         if self._fixtures:
-            for fixture_name, fixture_doc in self._fixtures:
+            for fixture_name, fixture_doc, fixture_result in self._fixtures:
+                if fixture_result:
+                    fixture_doc.extend(["**Fixture Result Value**:", fixture_result])
                 rst.definition(name=fixture_name,
                                text="\n".join(fixture_doc),
                                indent=3,
@@ -127,7 +129,7 @@ class NodeDocCollector(object):
         rst = self._build()
         rst.write(filename)
 
-    def add_fixture(self, fixturedef, param_index=0):
+    def add_fixture(self, fixturedef, param_index=0, result=None):
         """
         Add a fixture to the RST documentation.
 
@@ -142,7 +144,7 @@ class NodeDocCollector(object):
             doc = str(fixturedef.params[param_index])
         else:
             doc = fixturedef.func.__doc__ or "empty docstring"
-        fixture_info = (fixturedef.argname, doc_prep(doc))
+        fixture_info = (fixturedef.argname, doc_prep(doc), result)
         if fixture_info not in self._fixtures:
             self._fixtures.append(fixture_info)
 
@@ -193,7 +195,7 @@ def doccollect_parent(item, prev_item=None):
     if isinstance(item.parent, Session):
         # End recursion -- we hit the top level
         if prev_item._doccol not in item.parent.doc_collectors:
-            item.parent.doc_generators.append(prev_item._doccol)
+            item.parent.doc_collectors.append(prev_item._doccol)
         return
     if isinstance(item.parent, Instance):
         # Skip pytest Instances
@@ -237,18 +239,27 @@ def pytest_collection_modifyitems(items):
         doccollect_parent(test)
 
 
+@pytest.hookimpl(hookwrapper=True)
 def pytest_fixture_setup(fixturedef, request):
     """
     We can use this pytest hook to add in fixture doc info into each
     NodeDocCollector
     """
+    outcome = yield
+    res = None
+    if request.config.getoption("doc_fixture_results", None) or getattr(fixturedef.func, "_doc_result", False):
+        # Note: force the result to be a string. We don't want to be keeping around possibly very large
+        # objects that might be returned by fixtures. Also it ensures that we capture the state of the fixture
+        # *now* after setup is done, rather than what it might be at the time of the doc generation (end of test run)
+        res = str(outcome.get_result())
     try:
         doccol = request.node._doccol
-        doccol.add_fixture(fixturedef, request.param_index)
+        doccol.add_fixture(fixturedef, request.param_index, res)
     except Exception as exc:
         # TODO: Ignoring exceptions for now, but we should probably handle
         # them more gracefully.
         pass
+
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -266,14 +277,14 @@ def pytest_sessionstart(session):
     """
     Used to keep track of all doc collectors.
     """
-    session.doc_collector = []
+    session.doc_collectors = []
 
 
 def pytest_sessionfinish(session):
     """
     Write out results for each doc collector.
     """
-    for doc_collector in session.doc_collectors:
+    for doc_collector in getattr(session, "doc_collectors", []):
         doc_collector.write(
             os.path.join(session.config.getoption("rst_dir"),
                          doc_collector.node_name + ".rst"))
@@ -297,3 +308,15 @@ def pytest_addoption(parser):
                     help="Destination directory for the RST documentation",
                     default="_docs",
                     dest="rst_dir")
+    group.addoption("--doc-fixture-results",
+                    help="Force writing of the value of fixture results to the generated RST documentation",
+                    dest="doc_fixture_results")
+
+
+def doc_result(fixture):
+    """
+    Function decorator applied to a fixture that will force the result of a fixture
+    to be written to the doc generator.
+    """
+    fixture._doc_result = True
+    return fixture

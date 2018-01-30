@@ -12,7 +12,7 @@ def auth_session(request):
     :param: request
     :return
     """
-    return 0
+    return 1
 
 
 class TestRSABounds(object):
