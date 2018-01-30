@@ -32,6 +32,10 @@ This will generate rst files from the tests.
 From a test file setup like this::
 
 ```python
+    """
+    This is the docstring of the Module.
+    """
+    
     @pytest.fixture(scope='class')
     def a():
         '''
@@ -60,21 +64,9 @@ From a test file setup like this::
 An RST file would be generated on test execution::
 
 ```rst
-    =====
-    Title
-    =====
-
-    Test run description. The title & this description can either be preset, or
-    pulled from pytest runtime configuration via commandline.
-
-
-    .. topic:: Session Fixtures
-
-        fixture1
-            Fixture1's documentation
-
-        fixture 2
-            Fixture2's documentation
+    .. toctree::
+       :hidden:
+       :includehidden:
 
 
     Module.path.test_sample
@@ -127,7 +119,7 @@ An RST file would be generated on test execution::
        call
           FAILED
 
-          .. code-block:: none
+          ::
 
              self = <test_precons.TestRSABounds object at 0xb4176e0c>, auth_session = 0
 
@@ -140,7 +132,7 @@ An RST file would be generated on test execution::
              E         - False
              E         + This isn't really false
 
-             CC/test_precons.py:42: AssertionError
+             test_precons.py:42: AssertionError
 ```
 
 
