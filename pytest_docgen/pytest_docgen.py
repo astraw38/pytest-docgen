@@ -68,6 +68,11 @@ class NodeDocCollector(object):
         return "NodeDocCollector(name=%s, level=%s, children=%d)" % (self.node_name, self.level, len(self.children))
 
     def _build(self):
+        """
+        Build the RST doc for the current collector.
+
+        :return: rstcloth.rst object.
+        """
         rst = RstCloth()
         if self.write_toc:
             rst.directive(name="toctree",
@@ -115,7 +120,7 @@ class NodeDocCollector(object):
 
     def emit(self):
         """
-        Return internal representation of what a given node's rst doc output should be.
+        Return internal *raw-string* representation of this node's rst doc
         """
         rst = self._build()
         return rst.data
@@ -261,7 +266,6 @@ def pytest_fixture_setup(fixturedef, request):
         pass
 
 
-
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
     """
@@ -296,20 +300,21 @@ def pytest_addoption(parser):
 
     """
     group = parser.getgroup("RST Writer",
-                            description="Generates RST documentation for tests")
+                            description="RST documentation generator options")
     group.addoption("--title",
-                    help="Title for the Documentation",
+                    help="RST Document Title",
                     default="Test Documentation")
     group.addoption("--doc-desc",
-                    help="Description for these documented results",
+                    help="RST Document description",
                     dest="doc_desc",
                     default="Test case results")
     group.addoption("--rst-dir",
-                    help="Destination directory for the RST documentation",
+                    help="Destination directory for generated RST documentation",
                     default="_docs",
                     dest="rst_dir")
     group.addoption("--doc-fixture-results",
-                    help="Force writing of the value of fixture results to the generated RST documentation",
+                    help="Force writing of the value of fixture results to the generated RST documentation. Note: this "
+                         "can be enabled on a per-fixture bases with the `@doc_result` decorator",
                     dest="doc_fixture_results")
 
 
