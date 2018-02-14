@@ -44,7 +44,15 @@ def doc_prep(docstring):
     if not indents:
         return []
     min_indent = min(indents)
-    return [x[min_indent:] for x in doclines]
+    indented_docs = [x[min_indent:] for x in doclines]
+    # Remove leading and trailing 'empty lines'.
+    # this is to ensure we *always* have same data format coming into the doc writer.
+    # It's important for sorting out RST spacing.
+    if not indented_docs[0] or indented_docs[0].isspace():
+        indented_docs.pop(0)
+    if not indented_docs[-1] or indented_docs[-1].isspace():
+        indented_docs.pop(-1)
+    return indented_docs
 
 
 class NodeDocCollector(object):
@@ -92,7 +100,7 @@ class NodeDocCollector(object):
         if self._fixtures:
             for fixture_name, fixture_doc, fixture_result in self._fixtures:
                 if fixture_result:
-                    fixture_doc.extend(["**Fixture Result Value**:", fixture_result])
+                    fixture_doc.extend(["", "**Fixture Result Value**: ``{}``".format(fixture_result)])
                 rst.definition(name=fixture_name,
                                text="\n".join(fixture_doc),
                                indent=3,
@@ -240,6 +248,8 @@ def pytest_collection_modifyitems(items):
         test_doccol = NodeDocCollector(node_name=test.name,
                                        node_doc=test.obj.__doc__,
                                        level="function")
+        # TODO: This should store off the location of the source code, so we can do a
+        # literalincludes block if desired.
         test._doccol = test_doccol
         doccollect_parent(test)
 

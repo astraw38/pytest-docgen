@@ -6,9 +6,13 @@ DOCPREP_TESTDATA =[
     ("""""", []),
     ("""    hi
         test""", ["hi", "    test"]),
+    (
+    """
+    hello
+    """, ["hello"])
 ]
 
 
-@pytest.mark.parametrize("inval,outval", DOCPREP_TESTDATA, ids=["empty docstring", "simple"])
+@pytest.mark.parametrize("inval,outval", DOCPREP_TESTDATA, ids=["empty docstring", "simple", "newline, doc, newline"])
 def test_docprep(inval, outval):
-    assert doc_prep(inval) == outval
+    assert outval == doc_prep(inval)

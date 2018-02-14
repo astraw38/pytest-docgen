@@ -15,4 +15,5 @@ setup(
     classifiers=[
         "Framework :: Pytest",
     ],
+    install_requires=['rstcloth']
 )
