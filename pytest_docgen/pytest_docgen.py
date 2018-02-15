@@ -12,6 +12,7 @@ import inspect
 
 from _pytest.main import Session
 from _pytest.python import Instance
+from os import path
 from rstcloth.rstcloth import RstCloth
 
 # There are 4 levels we care about
@@ -61,10 +62,13 @@ class NodeDocCollector(object):
                  node_doc,
                  level="session",
                  write_toc=False,
-                 ):
+                 source_file=None,
+                 source_obj=None):
         self.node_name = node_name
         self.node_doc = node_doc
         self.write_toc = write_toc
+        self.source_file = source_file
+        self.source_obj = source_obj
         # Children should be a list of NodeDocCollectors of a smaller level.
         # Can be chained on down.
         self.children = []
@@ -93,11 +97,11 @@ class NodeDocCollector(object):
         rst.content(doc_prep(self.node_doc))
         rst.newline()
 
-        rst.directive(name="topic",
-                      arg="{}{} Fixtures".format(self.level[0].upper(), self.level[1:]))
-        rst.newline()
-
         if self._fixtures:
+            rst.directive(name="topic",
+                          arg="{}{} Fixtures".format(self.level[0].upper(), self.level[1:]))
+            rst.newline()
+
             for fixture_name, fixture_doc, fixture_result in self._fixtures:
                 if fixture_result:
                     fixture_doc.extend(["", "**Fixture Result Value**: ``{}``".format(fixture_result)])
@@ -105,10 +109,23 @@ class NodeDocCollector(object):
                                text="\n".join(fixture_doc),
                                indent=3,
                                wrap=False)  # Note: indent is 3 here so that it shows up under the Fixtures panel.
-        else:
-            rst.content("None!",
-                        indent=3)
         rst.newline(2)
+
+        if self.source_file:
+            rst.directive("container",
+                          arg="toggle")
+            rst.directive("container",
+                          arg="header",
+                          indent=3,
+                          content="Show/hide Source")
+            rst.newline()
+
+            rst.directive("literalincludes",
+                          arg=self.source_file,
+                          # Just do raw lines. We could do the pyobject though....
+                          fields=[("pyobject", self.source_obj)],
+                          indent=3)
+            rst.newline()
 
         if self._results:
             rst.directive("topic",
@@ -245,9 +262,16 @@ def pytest_collection_modifyitems(items):
     # run *after* list has been pared down.
     for test in items:
         # TBD: not completely sure if this is correct call
+        if test.cls:
+            prefix = test.cls.__name__ + "."
+        else:
+            prefix = ""
         test_doccol = NodeDocCollector(node_name=test.name,
                                        node_doc=test.obj.__doc__,
-                                       level="function")
+                                       level="function",
+                                       source_file=path.relpath(str(test.fspath),
+                                                                test.session.config.getoption("rst_dir")),
+                                       source_obj="{}{}".format(prefix, test.name))
         # TODO: This should store off the location of the source code, so we can do a
         # literalincludes block if desired.
         test._doccol = test_doccol
@@ -262,7 +286,7 @@ def pytest_fixture_setup(fixturedef, request):
     """
     outcome = yield
     res = None
-    if request.config.getoption("doc_fixture_results", None) or getattr(fixturedef.func, "_doc_result", False):
+    if request.config.getoption("rst_fixture_results", None) or getattr(fixturedef.func, "_doc_result", False):
         # Note: force the result to be a string. We don't want to be keeping around possibly very large
         # objects that might be returned by fixtures. Also it ensures that we capture the state of the fixture
         # *now* after setup is done, rather than what it might be at the time of the doc generation (end of test run)
@@ -298,6 +322,16 @@ def pytest_sessionfinish(session):
     """
     Write out results for each doc collector.
     """
+    index = RstCloth()
+    index.title(session.config.getoption("rst_title", "Test Results"))
+    index.newline()
+    index.content(session.config.getoption("rst_desc", ""))
+    index.directive(name="toctree",
+                    fields=[("includehidden", ""), ("glob", "")])
+    index.newline()
+    index.content(["*"], 3)
+    index.write(os.path.join(session.config.getoption("rst_dir"),
+                             "index.rst"))
     for doc_collector in getattr(session, "doc_collectors", []):
         doc_collector.write(
             os.path.join(session.config.getoption("rst_dir"),
@@ -311,21 +345,26 @@ def pytest_addoption(parser):
     """
     group = parser.getgroup("RST Writer",
                             description="RST documentation generator options")
-    group.addoption("--title",
+    group.addoption("--rst-title",
                     help="RST Document Title",
-                    default="Test Documentation")
-    group.addoption("--doc-desc",
+                    default="Test Documentation",
+                    dest="rst_title")
+    group.addoption("--rst-desc",
                     help="RST Document description",
-                    dest="doc_desc",
+                    dest="rst_desc",
                     default="Test case results")
     group.addoption("--rst-dir",
                     help="Destination directory for generated RST documentation",
                     default="_docs",
                     dest="rst_dir")
-    group.addoption("--doc-fixture-results",
+    group.addoption("--rst-fixture-results",
                     help="Force writing of the value of fixture results to the generated RST documentation. Note: this "
                          "can be enabled on a per-fixture bases with the `@doc_result` decorator",
-                    dest="doc_fixture_results")
+                    dest="rst_fixture_results",
+                    action="store_true")
+    group.addoption("--rst-include-src",
+                    help="Include source code for the test itself.",
+                    action="store_true")
 
 
 def doc_result(fixture):
