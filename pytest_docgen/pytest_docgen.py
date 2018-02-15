@@ -114,13 +114,14 @@ class NodeDocCollector(object):
         if self.source_file:
             rst.directive("container",
                           arg="toggle")
+            rst.newline()
             rst.directive("container",
                           arg="header",
                           indent=3,
                           content="Show/hide Source")
             rst.newline()
 
-            rst.directive("literalincludes",
+            rst.directive("literalinclude",
                           arg=self.source_file,
                           # Just do raw lines. We could do the pyobject though....
                           fields=[("pyobject", self.source_obj)],
