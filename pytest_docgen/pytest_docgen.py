@@ -6,6 +6,7 @@
 
 """
 import os
+from collections import defaultdict
 
 import pytest
 import inspect
@@ -20,6 +21,7 @@ from rstcloth.rstcloth import RstCloth
 # Level 1 ::    module      :: ------
 # Level 2 ::    class       :: ~~~~~~
 # Level 3 ::    function    :: ++++++
+from tabulate import tabulate
 
 SESSION_HEADER_MAP = {
     "session": "h1",
@@ -27,6 +29,7 @@ SESSION_HEADER_MAP = {
     "class": "h3",
     "function": "h4"
 }
+RESULTS_HEADER = ['Test Name', 'Setup', "Call", "Teardown"]
 
 
 def doc_prep(docstring):
@@ -60,10 +63,12 @@ class NodeDocCollector(object):
     def __init__(self,
                  node_name,
                  node_doc,
+                 node_id,
                  level="session",
                  write_toc=False,
                  source_file=None,
                  source_obj=None):
+        self.node_id = node_id.replace(":", "_")
         self.node_name = node_name
         self.node_doc = node_doc
         self.write_toc = write_toc
@@ -92,6 +97,8 @@ class NodeDocCollector(object):
                                   ('includehidden', '')])
             rst.newline()
 
+        rst.ref_target(self.node_id)
+        rst.newline()
         getattr(rst, SESSION_HEADER_MAP[self.level])(self.node_name)
         rst.newline()
         rst.content(doc_prep(self.node_doc))
@@ -197,6 +204,38 @@ class NodeDocCollector(object):
             outcome = [result.outcome.upper()]
         self._results.append((result.when, outcome))
 
+    def get_all_results(self):
+        all_results = []
+        local_result = self.get_simple_results()
+        if local_result:
+            all_results.append(self.get_simple_results())
+        for x in self.children:
+            all_results.extend(x.get_all_results())
+        return all_results
+
+    def get_simple_results(self):
+        """
+        Get a simple representation of the results. This should NOT include longrepr or repr of the failure.
+
+        :return:
+        """
+        # thie should ideally call any sub-collectors... right?
+        # We want the node name to also include a link ideally.
+        if self._results:
+            results = {'name': ':ref:`{} <{}>`'.format(self.node_name, self.node_id)}
+            for when, outcome in self._results:
+                simple_outcome = "".join(outcome)
+                if "FAILED" in simple_outcome:
+                    simple_outcome = "|failed|"
+                elif "PASSED" in simple_outcome:
+                    simple_outcome = "|checkmark|"
+                else:
+                    simple_outcome = "-"
+                results[when] = simple_outcome
+            return results
+        else:
+            return None
+
 
 def get_level(item):
     """
@@ -238,6 +277,7 @@ def doccollect_parent(item, prev_item=None):
         level = get_level(parent)
         doccol = NodeDocCollector(parent.obj.__name__,
                                   parent.obj.__doc__,
+                                  parent.nodeid,
                                   level=level,
                                   write_toc=level == "module")
         parent._doccol = doccol
@@ -269,10 +309,11 @@ def pytest_collection_modifyitems(items):
             prefix = ""
         test_doccol = NodeDocCollector(node_name=test.name,
                                        node_doc=test.obj.__doc__,
+                                       node_id=test.nodeid,
                                        level="function",
                                        source_file=path.relpath(str(test.fspath),
                                                                 test.session.config.getoption("rst_dir")),
-                                       source_obj="{}{}".format(prefix, test.name))
+                                       source_obj="{}{}".format(prefix, test.obj.__name__))
         # TODO: This should store off the location of the source code, so we can do a
         # literalincludes block if desired.
         test._doccol = test_doccol
@@ -327,16 +368,32 @@ def pytest_sessionfinish(session):
     index.title(session.config.getoption("rst_title", "Test Results"))
     index.newline()
     index.content(session.config.getoption("rst_desc", ""))
+    index.newline()
     index.directive(name="toctree",
                     fields=[("includehidden", ""), ("glob", "")])
     index.newline()
     index.content(["*"], 3)
-    index.write(os.path.join(session.config.getoption("rst_dir"),
-                             "index.rst"))
+    index.newline(2)
+
+    results = []
+    
     for doc_collector in getattr(session, "doc_collectors", []):
+        results.extend(doc_collector.get_all_results())
         doc_collector.write(
             os.path.join(session.config.getoption("rst_dir"),
                          doc_collector.node_name + ".rst"))
+
+    index._add(tabulate([(x['name'], x['setup'], x['call'], x['teardown'])
+                         for x in results],
+                        headers=RESULTS_HEADER,
+                        tablefmt='rst'))
+    index.newline(2)
+    index._add(".. |checkmark| unicode:: U+2714")
+    index.newline()
+    index._add(".. |failed| unicode:: U+274C")
+    index.newline()
+    index.write(os.path.join(session.config.getoption("rst_dir"),
+                             "index.rst"))
 
 
 def pytest_addoption(parser):
