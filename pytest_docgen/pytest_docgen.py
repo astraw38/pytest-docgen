@@ -84,6 +84,56 @@ class NodeDocCollector(object):
     def __str__(self):
         return "NodeDocCollector(name=%s, level=%s, children=%d)" % (self.node_name, self.level, len(self.children))
 
+    def _build_toc(self, rst):
+        rst.directive(name="toctree",
+                      fields=[('hidden', ''),
+                              ('includehidden', '')])
+        rst.newline()
+
+        rst.directive(name="contents")
+        rst.newline(2)
+
+    def _build_fixtures(self, rst):
+        rst.directive(name="topic",
+                      arg="{}{} Fixtures".format(self.level[0].upper(), self.level[1:]))
+        rst.newline()
+
+        for fixture_name, fixture_doc, fixture_result in self._fixtures:
+            if fixture_result:
+                fixture_doc.extend(["", "**Fixture Result Value**: ``{}``".format(fixture_result)])
+            rst.definition(name=fixture_name,
+                           text="\n".join(fixture_doc),
+                           indent=3,
+                           wrap=False)  # Note: indent is 3 here so that it shows up under the Fixtures panel.
+
+    def _build_source_link(self, rst):
+        rst.directive("container",
+                      arg="toggle")
+        rst.newline()
+        rst.directive("container",
+                      arg="header",
+                      indent=3,
+                      content="Show Source")
+        rst.newline()
+
+        rst.directive("literalinclude",
+                      arg=self.source_file,
+                      # Just do raw lines. We could do the pyobject though....
+                      fields=[("pyobject", self.source_obj)],
+                      indent=3)
+        rst.newline()
+
+    def _build_results(self, rst):
+        rst.directive("topic",
+                      arg="Test Results")
+        rst.newline()
+        for when, outcome in self._results:
+            rst.definition(name=when,
+                           text="\n".join(outcome),
+                           indent=3,
+                           bold=True,
+                           wrap=False)
+
     def _build(self):
         """
         Build the RST doc for the current collector.
@@ -92,11 +142,10 @@ class NodeDocCollector(object):
         """
         rst = RstCloth()
         if self.write_toc:
-            rst.directive(name="toctree",
-                          fields=[('hidden', ''),
-                                  ('includehidden', '')])
-            rst.newline()
+            self._build_toc(rst)
 
+        # Write ref target with full node ID
+        # because test names might not be unique, but full IDs should be.
         rst.ref_target(self.node_id)
         rst.newline()
         getattr(rst, SESSION_HEADER_MAP[self.level])(self.node_name)
@@ -105,46 +154,14 @@ class NodeDocCollector(object):
         rst.newline()
 
         if self._fixtures:
-            rst.directive(name="topic",
-                          arg="{}{} Fixtures".format(self.level[0].upper(), self.level[1:]))
-            rst.newline()
-
-            for fixture_name, fixture_doc, fixture_result in self._fixtures:
-                if fixture_result:
-                    fixture_doc.extend(["", "**Fixture Result Value**: ``{}``".format(fixture_result)])
-                rst.definition(name=fixture_name,
-                               text="\n".join(fixture_doc),
-                               indent=3,
-                               wrap=False)  # Note: indent is 3 here so that it shows up under the Fixtures panel.
+            self._build_fixtures(rst)
         rst.newline(2)
 
         if self.source_file:
-            rst.directive("container",
-                          arg="toggle")
-            rst.newline()
-            rst.directive("container",
-                          arg="header",
-                          indent=3,
-                          content="Show/hide Source")
-            rst.newline()
-
-            rst.directive("literalinclude",
-                          arg=self.source_file,
-                          # Just do raw lines. We could do the pyobject though....
-                          fields=[("pyobject", self.source_obj)],
-                          indent=3)
-            rst.newline()
+            self._build_source_link(rst)
 
         if self._results:
-            rst.directive("topic",
-                          arg="Test Results")
-            rst.newline()
-            for when, outcome in self._results:
-                rst.definition(name=when,
-                               text="\n".join(outcome),
-                               indent=3,
-                               bold=True,
-                               wrap=False)
+            self._build_results(rst)
 
         for subdoc in self.children:
             rst._add(subdoc.emit())
@@ -376,14 +393,14 @@ def pytest_sessionfinish(session):
     index.newline(2)
 
     results = []
-    
+
     for doc_collector in getattr(session, "doc_collectors", []):
         results.extend(doc_collector.get_all_results())
         doc_collector.write(
             os.path.join(session.config.getoption("rst_dir"),
                          doc_collector.node_name + ".rst"))
 
-    index._add(tabulate([(x['name'], x['setup'], x['call'], x['teardown'])
+    index._add(tabulate([(x['name'], x['setup'], x.get('call', "NOTRUN"), x.get('teardown', "NOTRUN"))
                          for x in results],
                         headers=RESULTS_HEADER,
                         tablefmt='rst'))
