@@ -328,8 +328,7 @@ def pytest_collection_modifyitems(items):
                                        node_doc=test.obj.__doc__,
                                        node_id=test.nodeid,
                                        level="function",
-                                       source_file=path.relpath(str(test.fspath),
-                                                                test.session.config.getoption("rst_dir")),
+                                       source_file=str(test.fspath),
                                        source_obj="{}{}".format(prefix, test.obj.__name__))
         # TODO: This should store off the location of the source code, so we can do a
         # literalincludes block if desired.
