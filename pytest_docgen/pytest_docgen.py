@@ -105,17 +105,13 @@ class NodeDocCollector(object):
                            text="\n".join(fixture_doc),
                            indent=3,
                            wrap=False)  # Note: indent is 3 here so that it shows up under the Fixtures panel.
+        rst.newline()
 
     def _build_source_link(self, rst):
-        rst.directive("container",
-                      arg="toggle")
-        rst.newline()
-        rst.directive("container",
-                      arg="header",
-                      indent=3,
-                      content="Show Source")
-        rst.newline()
 
+        rst.directive("topic",
+                      arg="Test Source")
+        rst.newline()
         rst.directive("literalinclude",
                       arg=self.source_file,
                       # Just do raw lines. We could do the pyobject though....
@@ -133,6 +129,7 @@ class NodeDocCollector(object):
                            indent=3,
                            bold=True,
                            wrap=False)
+        rst.newline()
 
     def _build(self):
         """
@@ -155,13 +152,12 @@ class NodeDocCollector(object):
 
         if self._fixtures:
             self._build_fixtures(rst)
-        rst.newline(2)
-
-        if self.source_file:
-            self._build_source_link(rst)
 
         if self._results:
             self._build_results(rst)
+
+        if self.source_file:
+            self._build_source_link(rst)
 
         for subdoc in self.children:
             rst._add(subdoc.emit())
@@ -380,16 +376,17 @@ def pytest_sessionfinish(session):
     """
     Write out results for each doc collector.
     """
-    index = RstCloth()
-    index.title(session.config.getoption("rst_title", "Test Results"))
-    index.newline()
-    index.content(session.config.getoption("rst_desc", ""))
-    index.newline()
-    index.directive(name="toctree",
-                    fields=[("includehidden", ""), ("glob", "")])
-    index.newline()
-    index.content(["*"], 3)
-    index.newline(2)
+    if session.config.getoption("rst_write_index"):
+        index = RstCloth()
+        index.title(session.config.getoption("rst_title", "Test Results"))
+        index.newline()
+        index.content(session.config.getoption("rst_desc", ""))
+        index.newline()
+        index.directive(name="toctree",
+                        fields=[("includehidden", ""), ("glob", "")])
+        index.newline()
+        index.content(["*"], 3)
+        index.newline(2)
 
     results = []
 
@@ -399,17 +396,18 @@ def pytest_sessionfinish(session):
             os.path.join(session.config.getoption("rst_dir"),
                          doc_collector.node_name + ".rst"))
 
-    index._add(tabulate([(x['name'], x['setup'], x.get('call', "NOTRUN"), x.get('teardown', "NOTRUN"))
-                         for x in results],
-                        headers=RESULTS_HEADER,
-                        tablefmt='rst'))
-    index.newline(2)
-    index._add(".. |checkmark| unicode:: U+2714")
-    index.newline()
-    index._add(".. |failed| unicode:: U+274C")
-    index.newline()
-    index.write(os.path.join(session.config.getoption("rst_dir"),
-                             "index.rst"))
+    result_rst = RstCloth()
+    result_rst._add(tabulate([(x['name'], x['setup'], x.get('call', "NOTRUN"), x.get('teardown', "NOTRUN"))
+                              for x in results],
+                             headers=RESULTS_HEADER,
+                             tablefmt='rst'))
+    result_rst.newline(2)
+    result_rst._add(".. |checkmark| unicode:: U+2714")
+    result_rst.newline()
+    result_rst._add(".. |failed| unicode:: U+274C")
+    result_rst.newline()
+    result_rst.write(os.path.join(session.config.getoption("rst_dir"),
+                                  "overview.rst"))
 
 
 def pytest_addoption(parser):
@@ -419,6 +417,10 @@ def pytest_addoption(parser):
     """
     group = parser.getgroup("RST Writer",
                             description="RST documentation generator options")
+    group.addoption("--rst-write-index",
+                    help="Write an RST index.rst file",
+                    action="store_true",
+                    default=False, )
     group.addoption("--rst-title",
                     help="RST Document Title",
                     default="Test Documentation",
