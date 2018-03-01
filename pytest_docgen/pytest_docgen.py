@@ -398,6 +398,8 @@ def pytest_sessionfinish(session):
                          doc_collector.node_name + ".rst"))
 
     result_rst = RstCloth()
+    result_rst.title("Test Result Table")
+    result_rst.newline()
     result_rst._add(tabulate([(x['name'], x['setup'], x.get('call', "NOTRUN"), x.get('teardown', "NOTRUN"))
                               for x in results],
                              headers=RESULTS_HEADER,
