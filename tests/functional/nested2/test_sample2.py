@@ -10,7 +10,7 @@ def auth_session(request):
     Login to a Token and return the authenticated session handle.
 
     :param: request
-    :return
+    :return: Session handle.
     """
     return 1
 

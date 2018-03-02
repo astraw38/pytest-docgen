@@ -6,12 +6,14 @@
 
 """
 import os
+from collections import defaultdict
 
 import pytest
 import inspect
 
 from _pytest.main import Session
 from _pytest.python import Instance
+from os import path
 from rstcloth.rstcloth import RstCloth
 
 # There are 4 levels we care about
@@ -19,6 +21,7 @@ from rstcloth.rstcloth import RstCloth
 # Level 1 ::    module      :: ------
 # Level 2 ::    class       :: ~~~~~~
 # Level 3 ::    function    :: ++++++
+from tabulate import tabulate
 
 SESSION_HEADER_MAP = {
     "session": "h1",
@@ -26,6 +29,7 @@ SESSION_HEADER_MAP = {
     "class": "h3",
     "function": "h4"
 }
+RESULTS_HEADER = ['Test Name', 'Setup', "Call", "Teardown"]
 
 
 def doc_prep(docstring):
@@ -59,12 +63,17 @@ class NodeDocCollector(object):
     def __init__(self,
                  node_name,
                  node_doc,
+                 node_id,
                  level="session",
                  write_toc=False,
-                 ):
+                 source_file=None,
+                 source_obj=None):
+        self.node_id = node_id.replace(":", "_")
         self.node_name = node_name
         self.node_doc = node_doc
         self.write_toc = write_toc
+        self.source_file = source_file
+        self.source_obj = source_obj
         # Children should be a list of NodeDocCollectors of a smaller level.
         # Can be chained on down.
         self.children = []
@@ -75,6 +84,53 @@ class NodeDocCollector(object):
     def __str__(self):
         return "NodeDocCollector(name=%s, level=%s, children=%d)" % (self.node_name, self.level, len(self.children))
 
+    def _build_toc(self, rst):
+        rst.directive(name="toctree",
+                      fields=[('hidden', ''),
+                              ('includehidden', '')])
+        rst.newline()
+
+        rst.directive(name="contents")
+        rst.newline(2)
+
+    def _build_fixtures(self, rst):
+        rst.directive(name="topic",
+                      arg="{}{} Fixtures".format(self.level[0].upper(), self.level[1:]))
+        rst.newline()
+
+        for fixture_name, fixture_doc, fixture_result in self._fixtures:
+            if fixture_result:
+                fixture_doc.extend(["", "**Fixture Result Value**: ``{}``".format(fixture_result)])
+            rst.definition(name=fixture_name,
+                           text="\n".join(fixture_doc),
+                           indent=3,
+                           wrap=False)  # Note: indent is 3 here so that it shows up under the Fixtures panel.
+        rst.newline()
+
+    def _build_source_link(self, rst):
+
+        rst.directive("topic",
+                      arg="Test Source")
+        rst.newline()
+        rst.directive("literalinclude",
+                      arg=self.source_file,
+                      # Just do raw lines. We could do the pyobject though....
+                      fields=[("pyobject", self.source_obj)],
+                      indent=3)
+        rst.newline()
+
+    def _build_results(self, rst):
+        rst.directive("topic",
+                      arg="Test Results")
+        rst.newline()
+        for when, outcome in self._results:
+            rst.definition(name=when,
+                           text="\n".join(outcome),
+                           indent=3,
+                           bold=True,
+                           wrap=False)
+        rst.newline()
+
     def _build(self):
         """
         Build the RST doc for the current collector.
@@ -83,43 +139,25 @@ class NodeDocCollector(object):
         """
         rst = RstCloth()
         if self.write_toc:
-            rst.directive(name="toctree",
-                          fields=[('hidden', ''),
-                                  ('includehidden', '')])
-            rst.newline()
+            self._build_toc(rst)
 
+        # Write ref target with full node ID
+        # because test names might not be unique, but full IDs should be.
+        rst.ref_target(self.node_id)
+        rst.newline()
         getattr(rst, SESSION_HEADER_MAP[self.level])(self.node_name)
         rst.newline()
         rst.content(doc_prep(self.node_doc))
         rst.newline()
 
-        rst.directive(name="topic",
-                      arg="{}{} Fixtures".format(self.level[0].upper(), self.level[1:]))
-        rst.newline()
-
         if self._fixtures:
-            for fixture_name, fixture_doc, fixture_result in self._fixtures:
-                if fixture_result:
-                    fixture_doc.extend(["", "**Fixture Result Value**: ``{}``".format(fixture_result)])
-                rst.definition(name=fixture_name,
-                               text="\n".join(fixture_doc),
-                               indent=3,
-                               wrap=False)  # Note: indent is 3 here so that it shows up under the Fixtures panel.
-        else:
-            rst.content("None!",
-                        indent=3)
-        rst.newline(2)
+            self._build_fixtures(rst)
 
         if self._results:
-            rst.directive("topic",
-                          arg="Test Results")
-            rst.newline()
-            for when, outcome in self._results:
-                rst.definition(name=when,
-                               text="\n".join(outcome),
-                               indent=3,
-                               bold=True,
-                               wrap=False)
+            self._build_results(rst)
+
+        if self.source_file:
+            self._build_source_link(rst)
 
         for subdoc in self.children:
             rst._add(subdoc.emit())
@@ -179,6 +217,38 @@ class NodeDocCollector(object):
             outcome = [result.outcome.upper()]
         self._results.append((result.when, outcome))
 
+    def get_all_results(self):
+        all_results = []
+        local_result = self.get_simple_results()
+        if local_result:
+            all_results.append(self.get_simple_results())
+        for x in self.children:
+            all_results.extend(x.get_all_results())
+        return all_results
+
+    def get_simple_results(self):
+        """
+        Get a simple representation of the results. This should NOT include longrepr or repr of the failure.
+
+        :return:
+        """
+        # thie should ideally call any sub-collectors... right?
+        # We want the node name to also include a link ideally.
+        if self._results:
+            results = {'name': ':ref:`{} <{}>`'.format(self.node_name, self.node_id)}
+            for when, outcome in self._results:
+                simple_outcome = "".join(outcome)
+                if "FAILED" in simple_outcome:
+                    simple_outcome = "|failed|"
+                elif "PASSED" in simple_outcome:
+                    simple_outcome = "|checkmark|"
+                else:
+                    simple_outcome = "-"
+                results[when] = simple_outcome
+            return results
+        else:
+            return None
+
 
 def get_level(item):
     """
@@ -220,6 +290,7 @@ def doccollect_parent(item, prev_item=None):
         level = get_level(parent)
         doccol = NodeDocCollector(parent.obj.__name__,
                                   parent.obj.__doc__,
+                                  parent.nodeid,
                                   level=level,
                                   write_toc=level == "module")
         parent._doccol = doccol
@@ -245,9 +316,17 @@ def pytest_collection_modifyitems(items):
     # run *after* list has been pared down.
     for test in items:
         # TBD: not completely sure if this is correct call
+        if test.cls:
+            prefix = test.cls.__name__ + "."
+        else:
+            prefix = ""
         test_doccol = NodeDocCollector(node_name=test.name,
                                        node_doc=test.obj.__doc__,
-                                       level="function")
+                                       node_id=test.nodeid,
+                                       level="function",
+                                       source_file=path.relpath(str(test.fspath),
+                                                                test.session.config.getoption("rst_dir")),
+                                       source_obj="{}{}".format(prefix, test.obj.__name__))
         # TODO: This should store off the location of the source code, so we can do a
         # literalincludes block if desired.
         test._doccol = test_doccol
@@ -262,7 +341,7 @@ def pytest_fixture_setup(fixturedef, request):
     """
     outcome = yield
     res = None
-    if request.config.getoption("doc_fixture_results", None) or getattr(fixturedef.func, "_doc_result", False):
+    if request.config.getoption("rst_fixture_results", None) or getattr(fixturedef.func, "_doc_result", False):
         # Note: force the result to be a string. We don't want to be keeping around possibly very large
         # objects that might be returned by fixtures. Also it ensures that we capture the state of the fixture
         # *now* after setup is done, rather than what it might be at the time of the doc generation (end of test run)
@@ -298,10 +377,40 @@ def pytest_sessionfinish(session):
     """
     Write out results for each doc collector.
     """
+    if session.config.getoption("rst_write_index"):
+        index = RstCloth()
+        index.title(session.config.getoption("rst_title", "Test Results"))
+        index.newline()
+        index.content(session.config.getoption("rst_desc", ""))
+        index.newline()
+        index.directive(name="toctree",
+                        fields=[("includehidden", ""), ("glob", "")])
+        index.newline()
+        index.content(["*"], 3)
+        index.newline(2)
+
+    results = []
+
     for doc_collector in getattr(session, "doc_collectors", []):
+        results.extend(doc_collector.get_all_results())
         doc_collector.write(
             os.path.join(session.config.getoption("rst_dir"),
                          doc_collector.node_name + ".rst"))
+
+    result_rst = RstCloth()
+    result_rst.title("Test Result Table")
+    result_rst.newline()
+    result_rst._add(tabulate([(x['name'], x['setup'], x.get('call', "NOTRUN"), x.get('teardown', "NOTRUN"))
+                              for x in results],
+                             headers=RESULTS_HEADER,
+                             tablefmt='rst'))
+    result_rst.newline(2)
+    result_rst._add(".. |checkmark| ..image:: check.png ")
+    result_rst.newline()
+    result_rst._add(".. |failed| ..image:: cross.png ")
+    result_rst.newline()
+    result_rst.write(os.path.join(session.config.getoption("rst_dir"),
+                                  "overview.rst"))
 
 
 def pytest_addoption(parser):
@@ -311,21 +420,30 @@ def pytest_addoption(parser):
     """
     group = parser.getgroup("RST Writer",
                             description="RST documentation generator options")
-    group.addoption("--title",
+    group.addoption("--rst-write-index",
+                    help="Write an RST index.rst file",
+                    action="store_true",
+                    default=False, )
+    group.addoption("--rst-title",
                     help="RST Document Title",
-                    default="Test Documentation")
-    group.addoption("--doc-desc",
+                    default="Test Documentation",
+                    dest="rst_title")
+    group.addoption("--rst-desc",
                     help="RST Document description",
-                    dest="doc_desc",
+                    dest="rst_desc",
                     default="Test case results")
     group.addoption("--rst-dir",
                     help="Destination directory for generated RST documentation",
                     default="_docs",
                     dest="rst_dir")
-    group.addoption("--doc-fixture-results",
+    group.addoption("--rst-fixture-results",
                     help="Force writing of the value of fixture results to the generated RST documentation. Note: this "
                          "can be enabled on a per-fixture bases with the `@doc_result` decorator",
-                    dest="doc_fixture_results")
+                    dest="rst_fixture_results",
+                    action="store_true")
+    group.addoption("--rst-include-src",
+                    help="Include source code for the test itself.",
+                    action="store_true")
 
 
 def doc_result(fixture):

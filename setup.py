@@ -15,5 +15,5 @@ setup(
     classifiers=[
         "Framework :: Pytest",
     ],
-    install_requires=['rstcloth']
+    install_requires=['rstcloth', 'tabulate']
 )
