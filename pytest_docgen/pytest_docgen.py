@@ -120,7 +120,7 @@ class NodeDocCollector(object):
 
     def _build_results(self, rst):
         res = self.get_simple_results()
-        table_results = [(when, res[when]) for when in ('setup', 'call', 'teardown')]
+        table_results = [[res['setup'], res['call'], res['teardown']]]
         rst_table = tabulate(table_results, ["Setup", "Call", "Teardown"],
                              tablefmt="rst")
         rst.h5("Results")
