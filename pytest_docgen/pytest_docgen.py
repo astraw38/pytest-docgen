@@ -109,8 +109,7 @@ class NodeDocCollector(object):
 
     def _build_source_link(self, rst):
 
-        rst.directive("topic",
-                      arg="Test Source")
+        rst.h5("Source Code")
         rst.newline()
         rst.directive("literalinclude",
                       arg=self.source_file,
@@ -120,15 +119,22 @@ class NodeDocCollector(object):
         rst.newline()
 
     def _build_results(self, rst):
-        rst.directive("topic",
-                      arg="Test Results")
+        res = self.get_simple_results()
+        table_results = [(when, res[when]) for when in ('setup', 'call', 'teardown')]
+        rst_table = tabulate(table_results, ["Setup", "Call", "Teardown"],
+                             tablefmt="rst")
+        rst.h5("Results")
         rst.newline()
+        rst._add(rst_table)
+        rst.newline()
+
         for when, outcome in self._results:
-            rst.definition(name=when,
-                           text="\n".join(outcome),
-                           indent=3,
-                           bold=True,
-                           wrap=False)
+            if outcome == "PASSED":
+                continue
+            else:
+                rst.h5("{} Failure Details".format(when))
+                rst.codeblock(content=outcome,
+                              language="python")
         rst.newline()
 
     def _build(self):
@@ -178,6 +184,10 @@ class NodeDocCollector(object):
         :param str filename: File to write.
         """
         rst = self._build()
+        rst._add(".. |passed| image:: images/passed.png ")
+        rst.newline()
+        rst._add(".. |failed| image:: images/failed.png ")
+        rst.newline()
         rst.write(filename)
 
     def add_fixture(self, fixturedef, param_index=0, result=None):
@@ -210,11 +220,9 @@ class NodeDocCollector(object):
         if result.outcome != "passed":
             # Store the longrepr
             # TODO: This might need to do some munging on the data.
-            outcome = ['FAILED',
-                       '::'
-                       ] + ["".join(["   ", x]) for x in result.longreprtext.split('\n')]
+            outcome = ["".join(["   ", x]) for x in result.longreprtext.split('\n')]
         else:
-            outcome = [result.outcome.upper()]
+            outcome = result.outcome.upper()
         self._results.append((result.when, outcome))
 
     def get_all_results(self):
@@ -238,12 +246,10 @@ class NodeDocCollector(object):
             results = {'name': ':ref:`{} <{}>`'.format(self.node_name, self.node_id)}
             for when, outcome in self._results:
                 simple_outcome = "".join(outcome)
-                if "FAILED" in simple_outcome:
-                    simple_outcome = "|failed|"
-                elif "PASSED" in simple_outcome:
-                    simple_outcome = "|checkmark|"
+                if "PASSED" in simple_outcome:
+                    simple_outcome = "|passed|"
                 else:
-                    simple_outcome = "-"
+                    simple_outcome = "|failed|"
                 results[when] = simple_outcome
             return results
         else:
@@ -405,9 +411,9 @@ def pytest_sessionfinish(session):
                              headers=RESULTS_HEADER,
                              tablefmt='rst'))
     result_rst.newline(2)
-    result_rst._add(".. |checkmark| ..image:: check.png ")
+    result_rst._add(".. |passed| image:: images/passed.png ")
     result_rst.newline()
-    result_rst._add(".. |failed| ..image:: cross.png ")
+    result_rst._add(".. |failed| image:: images/failed.png ")
     result_rst.newline()
     result_rst.write(os.path.join(session.config.getoption("rst_dir"),
                                   "overview.rst"))
