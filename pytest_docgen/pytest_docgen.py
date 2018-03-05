@@ -11,6 +11,7 @@ from collections import defaultdict
 import pytest
 import inspect
 
+import shutil
 from _pytest.main import Session
 from _pytest.python import Instance
 from os import path
@@ -67,19 +68,22 @@ class NodeDocCollector(object):
                  level="session",
                  write_toc=False,
                  source_file=None,
-                 source_obj=None):
+                 source_obj=None,
+                 log_location=None):
         self.node_id = node_id.replace(":", "_")
         self.node_name = node_name
         self.node_doc = node_doc
         self.write_toc = write_toc
         self.source_file = source_file
         self.source_obj = source_obj
+        self.write_logs = False
         # Children should be a list of NodeDocCollectors of a smaller level.
         # Can be chained on down.
         self.children = []
         self._fixtures = []
         self._results = []
         self.level = level
+        self.log_location = log_location
 
     def __str__(self):
         return "NodeDocCollector(name=%s, level=%s, children=%d)" % (self.node_name, self.level, len(self.children))
@@ -128,7 +132,7 @@ class NodeDocCollector(object):
         rst._add(rst_table)
         rst.newline()
 
-        for when, outcome in self._results:
+        for when, outcome, log_link in self._results:
             if outcome == "PASSED":
                 continue
             else:
@@ -136,6 +140,25 @@ class NodeDocCollector(object):
                 rst.codeblock(content=outcome,
                               language="python")
         rst.newline()
+
+    def _build_logs(self, rst):
+        rst.h5("Test Output")
+        rst.newline()
+
+        for when, _, log_data in self._results:
+            log_start, log_end = log_data
+            if log_start == log_end:
+                continue
+
+            rst.content(rst.bold(when))
+            rst.newline()
+            rst.directive("literalinclude",
+                          # Note: popping off the top-level directory, as that's the top level rst_dir
+                          arg=os.path.join(*(self.log_location.split(os.path.sep)[1:])),
+                          # Just do raw lines. We could do the pyobject though....
+                          fields=[("lines", "{}-{}".format(log_start, log_end))],
+                          indent=3)
+            rst.newline()
 
     def _build(self):
         """
@@ -161,6 +184,9 @@ class NodeDocCollector(object):
 
         if self._results:
             self._build_results(rst)
+
+        if self.write_logs:
+            self._build_logs(rst)
 
         if self.source_file:
             self._build_source_link(rst)
@@ -223,7 +249,31 @@ class NodeDocCollector(object):
             outcome = ["".join(["   ", x]) for x in result.longreprtext.split('\n')]
         else:
             outcome = result.outcome.upper()
-        self._results.append((result.when, outcome))
+
+        log_dir = os.path.dirname(self.log_location)
+        os.makedirs(log_dir, exist_ok=True)
+
+        # Module or Class DocCollectors don't have a log location set, however they
+        # *also* don't have a result to add. So this is safe... for now.
+        with open(self.log_location, "a+") as log:
+            # Seek to end of file.
+            log.seek(0)
+            log_start = log.read().count("\n") + 1
+            log_end = log_start
+            if result.capstdout:
+                log.write("{0} Captured {1} stdout {0}\n".format("=" * 20, result.when))
+                log.write(result.capstdout)
+                log.write("{0} End stdout {0}\n".format("=" * 20))
+                log_end += result.capstdout.count('\n') + 1
+            if result.capstderr:
+                # I'm not terribly happy with this formatting, but meh.
+                log.write("{0} Captured {1} stderr {0}\n".format("=" * 20, result.when))
+                log.write(result.capstderr)
+                log.write("{0} End stderr {0}\n".format("=" * 20))
+                log_end += result.capstderr.count('\n') + 1
+
+        self.write_logs = self.write_logs or (log_start != log_end)
+        self._results.append((result.when, outcome, (log_start, log_end)))
 
     def get_all_results(self):
         all_results = []
@@ -244,7 +294,7 @@ class NodeDocCollector(object):
         # We want the node name to also include a link ideally.
         if self._results:
             results = {'name': ':ref:`{} <{}>`'.format(self.node_name, self.node_id)}
-            for when, outcome in self._results:
+            for when, outcome, log_link in self._results:
                 simple_outcome = "".join(outcome)
                 if "PASSED" in simple_outcome:
                     simple_outcome = "|passed|"
@@ -278,6 +328,42 @@ def doccollect_parent(item, prev_item=None):
     Set up doc collectors for each level.
     This is the time we have to do this, because it's really hard to get
     a given object's docstring w/o using fixtures.
+
+    This is a recursive call.
+
+    This is initially called on a test Function. If the test is at the module level,
+    then its parent will be a Module, and it's parent the Session. If the test is in a class, the structure will look
+    like::
+
+        Function
+        Instance
+        Class
+        Module
+        Session
+
+    We skip Instance, since it should have no difference in content than the Class.
+
+    Because there can be multiple test Functions under one Class or Module (or Classes under a Module, etc),
+    when we step up a level, we check to see if there is already a pre-existing DocCollector.
+
+    If there is a pre-existing parent DocCollector, we will append the *current* DocCollector as a child of the parent.
+    This ensures that structure of the final documents is correct.
+
+    Sample final structure::
+
+        Session
+            Module1
+                Function
+                Class
+                    Function
+                Class
+                    Function
+                    Function
+            Module2
+                Class
+                    Function
+                    Function
+                    Function
     """
     if not prev_item:
         prev_item = item
@@ -298,7 +384,7 @@ def doccollect_parent(item, prev_item=None):
                                   parent.obj.__doc__,
                                   parent.nodeid,
                                   level=level,
-                                  write_toc=level == "module")
+                                  write_toc=level == "module",)
         parent._doccol = doccol
 
     if prev_item._doccol not in doccol.children:
@@ -332,9 +418,14 @@ def pytest_collection_modifyitems(items):
                                        level="function",
                                        source_file=path.relpath(str(test.fspath),
                                                                 test.session.config.getoption("rst_dir")),
-                                       source_obj="{}{}".format(prefix, test.obj.__name__))
-        # TODO: This should store off the location of the source code, so we can do a
-        # literalincludes block if desired.
+                                       source_obj="{}{}".format(prefix, test.obj.__name__),
+                                       # Log location right now is **directory nested**.
+                                       # That's because we use the test.location, which is a direct path to the
+                                       # test file from the test root.
+                                       # This could be changed to be a flat structure if we wanted.
+                                       log_location=path.join(test.session.config.getoption("rst_dir"),
+                                                              "logs",
+                                                              test.location[0].replace('.py', '.log')))
         test._doccol = test_doccol
         doccollect_parent(test)
 
@@ -403,6 +494,7 @@ def pytest_sessionfinish(session):
             os.path.join(session.config.getoption("rst_dir"),
                          doc_collector.node_name + ".rst"))
 
+    # Writes the Overview.rst file.
     result_rst = RstCloth()
     result_rst.title("Test Result Table")
     result_rst.newline()
@@ -417,6 +509,11 @@ def pytest_sessionfinish(session):
     result_rst.newline()
     result_rst.write(os.path.join(session.config.getoption("rst_dir"),
                                   "overview.rst"))
+
+    # Todo: Write a test log data rst.
+    # Theoretically, this should let us put it as an appendix in Latext. Having it generate
+    # single RST files like overview & logdata will allow users (aka me) to customize how the generated TOC
+    # and such is done.
 
 
 def pytest_addoption(parser):
@@ -446,10 +543,18 @@ def pytest_addoption(parser):
                     help="Force writing of the value of fixture results to the generated RST documentation. Note: this "
                          "can be enabled on a per-fixture bases with the `@doc_result` decorator",
                     dest="rst_fixture_results",
-                    action="store_true")
+                    action="store_true",
+                    default=True)
     group.addoption("--rst-include-src",
                     help="Include source code for the test itself.",
-                    action="store_true")
+                    action="store_true",
+                    default=True)
+
+
+def pytest_configure(config):
+    if os.path.exists(path.join(config.getoption('rst_dir'), "logs")):
+        shutil.rmtree(path.join(config.getoption('rst_dir'), "logs"))
+
 
 
 def doc_result(fixture):

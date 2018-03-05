@@ -32,9 +32,12 @@ def auth_session(request):
 
     :return: Allocated :class:`~LunaTAP.core.client.node.ClientNode`
     """
-    return "This is a test fixture"
+    print("Fixture setup: auth_session")
+    yield "This is a test fixture"
+    print("Fixture teardown: auth_session")
 
 def test_module_level_test():
+    print("Call: test_module_level_test")
     pass
 
 def test_module_level_test2():
@@ -48,7 +51,8 @@ class TestRSABounds(object):
         """
         When modulus bits < 2048 using only FIPS primes, should return CKR_KEY_SIZE_RANGE
         """
-        pass
+        print("Call: test_bad_modulus")
+
 
     @pytest.mark.parametrize('mech', [1,
                                       2],
@@ -58,10 +62,11 @@ class TestRSABounds(object):
         Validate that AUX primes & regular primes sign/verify correctly
         with the largest possible valid exponent.
         """
-        pass
+        print("Call: test_largest_valid_exponent, mech: %s" % mech)
 
     def test_bad_modulus_failing(self, auth_session):
         """
         Fail this test, cause I want to see decent output.
         """
+        print("Call: test_bad_modulus_failing")
         assert "False" == "This isn't really false"

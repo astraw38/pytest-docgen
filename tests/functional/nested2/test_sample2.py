@@ -23,19 +23,22 @@ class TestRSABounds(object):
         """
         When modulus bits < 2048 using only FIPS primes, should return CKR_KEY_SIZE_RANGE
         """
-        pass
+        print("Call: test_bad_modulus")
 
-    @pytest.mark.parametrize('mech', [1, 2],
+
+    @pytest.mark.parametrize('mech', [1,
+                                      2],
                              ids=["186_3_PRIMES", "186_3_AUX_PRIMES"])
     def test_largest_valid_exponent(self, auth_session, mech):
         """
         Validate that AUX primes & regular primes sign/verify correctly
         with the largest possible valid exponent.
         """
-        assert 1 == mech
+        print("Call: test_largest_valid_exponent, mech: %s" % mech)
 
     def test_bad_modulus_failing(self, auth_session):
         """
         Fail this test, cause I want to see decent output.
         """
+        print("Call: test_bad_modulus_failing")
         assert "False" == "This isn't really false"
