@@ -6,12 +6,14 @@
 
 """
 import os
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 import pytest
 import inspect
 
 import shutil
+
+from _pytest.logging import LogCaptureFixture
 from _pytest.main import Session
 from _pytest.python import Instance
 from os import path
@@ -31,6 +33,10 @@ SESSION_HEADER_MAP = {
     "function": "h4"
 }
 RESULTS_HEADER = ['Test Name', 'Setup', "Call", "Teardown"]
+
+
+def _pop_top_dir(path):
+    return os.path.join(*(path.split(os.path.sep)[1:]))
 
 
 def doc_prep(docstring):
@@ -60,6 +66,7 @@ def doc_prep(docstring):
     return indented_docs
 
 
+
 class NodeDocCollector(object):
     def __init__(self,
                  node_name,
@@ -76,14 +83,21 @@ class NodeDocCollector(object):
         self.write_toc = write_toc
         self.source_file = source_file
         self.source_obj = source_obj
-        self.write_logs = False
+        self.write_logs = level == "function"
         # Children should be a list of NodeDocCollectors of a smaller level.
         # Can be chained on down.
         self.children = []
         self._fixtures = []
         self._results = []
         self.level = level
-        self.log_location = log_location
+
+        self.log_location = path.splitext(log_location)[0] if log_location else None
+        self.log_data = OrderedDict()
+        self.capture_start = 0
+        self.capture_end = 0
+        if log_location:
+            log_dir = os.path.dirname(self.log_location)
+            os.makedirs(log_dir, exist_ok=True)
 
     def __str__(self):
         return "NodeDocCollector(name=%s, level=%s, children=%d)" % (self.node_name, self.level, len(self.children))
@@ -132,7 +146,7 @@ class NodeDocCollector(object):
         rst._add(rst_table)
         rst.newline()
 
-        for when, outcome, log_link in self._results:
+        for when, outcome in self._results:
             if outcome == "PASSED":
                 continue
             else:
@@ -145,18 +159,21 @@ class NodeDocCollector(object):
         rst.h5("Test Output")
         rst.newline()
 
-        for when, _, log_data in self._results:
-            log_start, log_end = log_data
-            if log_start == log_end:
-                continue
-
+        for when, data in self.log_data.items():
             rst.content(rst.bold(when))
+            rst.newline()
+            rst.codeblock(content=data.splitlines(),
+                          language="none")
+            rst.newline()
+
+        if self.capture_start != self.capture_end:
+            rst.content(rst.bold("Captured Output"))
             rst.newline()
             rst.directive("literalinclude",
                           # Note: popping off the top-level directory, as that's the top level rst_dir
-                          arg=os.path.join(*(self.log_location.split(os.path.sep)[1:])),
+                          arg="{}.log".format(_pop_top_dir(self.log_location)),
                           # Just do raw lines. We could do the pyobject though....
-                          fields=[("lines", "{}-{}".format(log_start, log_end))],
+                          fields=[("lines", "{}-{}".format(self.capture_start, self.capture_end))],
                           indent=3)
             rst.newline()
 
@@ -235,11 +252,47 @@ class NodeDocCollector(object):
         if fixture_info not in self._fixtures:
             self._fixtures.append(fixture_info)
 
+
+    # Logging notes:
+    # caplog doesn't always work with get_records. I assume it's order of ops, since i'm kind of creating the fixture
+    # as needed. I should probably copy some of the internal stuff instead.
+    #
+    # Caplog != captured stdout/stderr. Caplog is specifically for LOGGING output.
+    #
+    # Captured stdout/stderr seems to accumulate across the setup/call/teardown. This means you can't just
+    # grab the result.stdout/stderr at the given test point. It should only be done probably once-per test.
+
+    def add_logdata(self, log_data, when):
+        if log_data:
+            self.log_data[when] = log_data
+
+    def add_capture(self, capstdout=None, capstderr=None):
+        # Todo: sort out whether the result stdout capture cares about the when.
+        # It looks like it should only be done once, thus the check for teardown.
+
+        # Module or Class DocCollectors don't have a log location set, however they
+        # *also* don't have a result to add. So this is safe... for now.
+        with open("{}.log".format(self.log_location), "a+") as log:
+            # Seek to end of file.
+            log.seek(0)
+            self.capture_start = log.read().count("\n") + 1
+            self.capture_end = self.capture_start
+            if capstdout:
+                log.write("{0} Captured stdout {0}\n".format("=" * 20))
+                log.write(capstdout)
+                log.write("{0} End stdout {0}\n".format("=" * 20))
+                self.capture_end += capstdout.count('\n') + 1
+            if capstderr:
+                log.write("{0} Captured stdout {0}\n".format("=" * 20))
+                log.write(capstderr)
+                log.write("{0} End stdout {0}\n".format("=" * 20))
+                self.capture_end += capstderr.count('\n') + 1
+
     def add_result(self, result):
         """
         Add a test result to the documentation.
 
-        This should be called 3x for each test -- 1x for setup, 1x for call, 1x for teardown.
+        This will be called 3x for each test -- 1x for setup, 1x for call, 1x for teardown.
 
         :param result: Pytest result object
         """
@@ -250,30 +303,7 @@ class NodeDocCollector(object):
         else:
             outcome = result.outcome.upper()
 
-        log_dir = os.path.dirname(self.log_location)
-        os.makedirs(log_dir, exist_ok=True)
-
-        # Module or Class DocCollectors don't have a log location set, however they
-        # *also* don't have a result to add. So this is safe... for now.
-        with open(self.log_location, "a+") as log:
-            # Seek to end of file.
-            log.seek(0)
-            log_start = log.read().count("\n") + 1
-            log_end = log_start
-            if result.capstdout:
-                log.write("{0} Captured {1} stdout {0}\n".format("=" * 20, result.when))
-                log.write(result.capstdout)
-                log.write("{0} End stdout {0}\n".format("=" * 20))
-                log_end += result.capstdout.count('\n') + 1
-            if result.capstderr:
-                # I'm not terribly happy with this formatting, but meh.
-                log.write("{0} Captured {1} stderr {0}\n".format("=" * 20, result.when))
-                log.write(result.capstderr)
-                log.write("{0} End stderr {0}\n".format("=" * 20))
-                log_end += result.capstderr.count('\n') + 1
-
-        self.write_logs = self.write_logs or (log_start != log_end)
-        self._results.append((result.when, outcome, (log_start, log_end)))
+        self._results.append((result.when, outcome))
 
     def get_all_results(self):
         all_results = []
@@ -294,7 +324,7 @@ class NodeDocCollector(object):
         # We want the node name to also include a link ideally.
         if self._results:
             results = {'name': ':ref:`{} <{}>`'.format(self.node_name, self.node_id)}
-            for when, outcome, log_link in self._results:
+            for when, outcome in self._results:
                 simple_outcome = "".join(outcome)
                 if "PASSED" in simple_outcome:
                     simple_outcome = "|passed|"
@@ -419,7 +449,7 @@ def pytest_collection_modifyitems(items):
                                        source_file=path.relpath(str(test.fspath),
                                                                 test.session.config.getoption("rst_dir")),
                                        source_obj="{}{}".format(prefix, test.obj.__name__),
-                                       # Log location right now is **directory nested**.
+                                       # Log location right now is **directory printing_tests**.
                                        # That's because we use the test.location, which is a direct path to the
                                        # test file from the test root.
                                        # This could be changed to be a flat structure if we wanted.
@@ -461,6 +491,31 @@ def pytest_runtest_makereport(item, call):
     res = outcome.get_result()
     doccol = item._doccol
     doccol.add_result(res)
+    if res.when == "teardown":
+        doccol.add_capture(capstdout=res.capstdout,
+                           capstderr=res.capstderr)
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_setup(item):
+    yield
+    item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(),
+                             'setup')
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_call(item):
+    yield
+    item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(),
+                             'call')
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_teardown(item):
+    yield
+    item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(),
+                             'teardown')
+
 
 
 def pytest_sessionstart(session):
