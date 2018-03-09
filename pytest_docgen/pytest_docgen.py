@@ -66,7 +66,6 @@ def doc_prep(docstring):
     return indented_docs
 
 
-
 class NodeDocCollector(object):
     def __init__(self,
                  node_name,
@@ -252,7 +251,6 @@ class NodeDocCollector(object):
         if fixture_info not in self._fixtures:
             self._fixtures.append(fixture_info)
 
-
     # Logging notes:
     # caplog doesn't always work with get_records. I assume it's order of ops, since i'm kind of creating the fixture
     # as needed. I should probably copy some of the internal stuff instead.
@@ -414,7 +412,7 @@ def doccollect_parent(item, prev_item=None):
                                   parent.obj.__doc__,
                                   parent.nodeid,
                                   level=level,
-                                  write_toc=level == "module",)
+                                  write_toc=level == "module", )
         parent._doccol = doccol
 
     if prev_item._doccol not in doccol.children:
@@ -423,7 +421,7 @@ def doccollect_parent(item, prev_item=None):
 
 
 @pytest.hookimpl(hookwrapper=True)
-def pytest_collection_modifyitems(items):
+def pytest_collection_modifyitems(session, config, items):
     """
     Add NodeDocCollectors to each level of test collectors:
 
@@ -434,30 +432,31 @@ def pytest_collection_modifyitems(items):
         test session)
     """
     yield
-    # Note: we shouldn't need to modify the item list, but we should
-    # run *after* list has been pared down.
-    for test in items:
-        # TBD: not completely sure if this is correct call
-        if test.cls:
-            prefix = test.cls.__name__ + "."
-        else:
-            prefix = ""
-        test_doccol = NodeDocCollector(node_name=test.name,
-                                       node_doc=test.obj.__doc__,
-                                       node_id=test.nodeid,
-                                       level="function",
-                                       source_file=path.relpath(str(test.fspath),
-                                                                test.session.config.getoption("rst_dir")),
-                                       source_obj="{}{}".format(prefix, test.obj.__name__),
-                                       # Log location right now is **directory printing_tests**.
-                                       # That's because we use the test.location, which is a direct path to the
-                                       # test file from the test root.
-                                       # This could be changed to be a flat structure if we wanted.
-                                       log_location=path.join(test.session.config.getoption("rst_dir"),
-                                                              "logs",
-                                                              test.location[0].replace('.py', '.log')))
-        test._doccol = test_doccol
-        doccollect_parent(test)
+    if config.getoption("rst_dir"):
+        # Note: we shouldn't need to modify the item list, but we should
+        # run *after* list has been pared down.
+        for test in items:
+            # TBD: not completely sure if this is correct call
+            if test.cls:
+                prefix = test.cls.__name__ + "."
+            else:
+                prefix = ""
+            test_doccol = NodeDocCollector(node_name=test.name,
+                                           node_doc=test.obj.__doc__,
+                                           node_id=test.nodeid,
+                                           level="function",
+                                           source_file=path.relpath(str(test.fspath),
+                                                                    test.session.config.getoption("rst_dir")),
+                                           source_obj="{}{}".format(prefix, test.obj.__name__),
+                                           # Log location right now is **directory printing_tests**.
+                                           # That's because we use the test.location, which is a direct path to the
+                                           # test file from the test root.
+                                           # This could be changed to be a flat structure if we wanted.
+                                           log_location=path.join(test.session.config.getoption("rst_dir"),
+                                                                  "logs",
+                                                                  test.location[0].replace('.py', '.log')))
+            test._doccol = test_doccol
+            doccollect_parent(test)
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -468,18 +467,19 @@ def pytest_fixture_setup(fixturedef, request):
     """
     outcome = yield
     res = None
-    if request.config.getoption("rst_fixture_results", None) or getattr(fixturedef.func, "_doc_result", False):
-        # Note: force the result to be a string. We don't want to be keeping around possibly very large
-        # objects that might be returned by fixtures. Also it ensures that we capture the state of the fixture
-        # *now* after setup is done, rather than what it might be at the time of the doc generation (end of test run)
-        res = str(outcome.get_result())
-    try:
-        doccol = request.node._doccol
-        doccol.add_fixture(fixturedef, request.param_index, res)
-    except Exception as exc:
-        # TODO: Ignoring exceptions for now, but we should probably handle
-        # them more gracefully.
-        pass
+    if request.config.getoption("rst_dir"):
+        if request.config.getoption("rst_fixture_results", None) or getattr(fixturedef.func, "_doc_result", False):
+            # Note: force the result to be a string. We don't want to be keeping around possibly very large
+            # objects that might be returned by fixtures. Also it ensures that we capture the state of the fixture
+            # *now* after setup is done, rather than what it might be at the time of the doc generation (end of test run)
+            res = str(outcome.get_result())
+        try:
+            doccol = request.node._doccol
+            doccol.add_fixture(fixturedef, request.param_index, res)
+        except Exception as exc:
+            # TODO: Ignoring exceptions for now, but we should probably handle
+            # them more gracefully.
+            pass
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -488,87 +488,92 @@ def pytest_runtest_makereport(item, call):
     Add in test results to doc collectors.
     """
     outcome = yield
-    res = outcome.get_result()
-    doccol = item._doccol
-    doccol.add_result(res)
-    if res.when == "teardown":
-        doccol.add_capture(capstdout=res.capstdout,
-                           capstderr=res.capstderr)
+    if item.session.config.getoption("rst_dir"):
+        res = outcome.get_result()
+        doccol = item._doccol
+        doccol.add_result(res)
+        if res.when == "teardown":
+            doccol.add_capture(capstdout=res.capstdout,
+                               capstderr=res.capstderr)
 
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_setup(item):
     yield
-    item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(),
-                             'setup')
+    if item.session.config.getoption("rst_dir"):
+        item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(),
+                                 'setup')
 
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_call(item):
     yield
-    item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(),
-                             'call')
+    if item.session.config.getoption("rst_dir"):
+        item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(),
+                                 'call')
 
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_teardown(item):
     yield
-    item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(),
-                             'teardown')
-
+    if item.session.config.getoption("rst_dir"):
+        item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(),
+                                 'teardown')
 
 
 def pytest_sessionstart(session):
     """
     Used to keep track of all doc collectors.
     """
-    session.doc_collectors = []
+    if session.config.getoption("rst_dir"):
+        session.doc_collectors = []
 
 
 def pytest_sessionfinish(session):
     """
     Write out results for each doc collector.
     """
-    if session.config.getoption("rst_write_index"):
-        index = RstCloth()
-        index.title(session.config.getoption("rst_title", "Test Results"))
-        index.newline()
-        index.content(session.config.getoption("rst_desc", ""))
-        index.newline()
-        index.directive(name="toctree",
-                        fields=[("includehidden", ""), ("glob", "")])
-        index.newline()
-        index.content(["*"], 3)
-        index.newline(2)
+    if session.config.getoption("rst_dir"):
+        if session.config.getoption("rst_write_index"):
+            index = RstCloth()
+            index.title(session.config.getoption("rst_title", "Test Results"))
+            index.newline()
+            index.content(session.config.getoption("rst_desc", ""))
+            index.newline()
+            index.directive(name="toctree",
+                            fields=[("includehidden", ""), ("glob", "")])
+            index.newline()
+            index.content(["*"], 3)
+            index.newline(2)
 
-    results = []
+        results = []
 
-    for doc_collector in getattr(session, "doc_collectors", []):
-        results.extend(doc_collector.get_all_results())
-        doc_collector.write(
-            os.path.join(session.config.getoption("rst_dir"),
-                         doc_collector.node_name + ".rst"))
+        for doc_collector in getattr(session, "doc_collectors", []):
+            results.extend(doc_collector.get_all_results())
+            doc_collector.write(
+                os.path.join(session.config.getoption("rst_dir"),
+                             doc_collector.node_name + ".rst"))
 
-    # Writes the Overview.rst file.
-    result_rst = RstCloth()
-    result_rst.title("Test Result Table")
-    result_rst.newline()
-    result_rst._add(tabulate([(x['name'], x['setup'], x.get('call', "NOTRUN"), x.get('teardown', "NOTRUN"))
-                              for x in results],
-                             headers=RESULTS_HEADER,
-                             tablefmt='rst'))
-    result_rst.newline(2)
-    result_rst._add(".. |passed| image:: images/passed.png ")
-    result_rst.newline()
-    result_rst._add(".. |failed| image:: images/failed.png ")
-    result_rst.newline()
-    result_rst.write(os.path.join(session.config.getoption("rst_dir"),
-                                  "overview.rst"))
+        # Writes the Overview.rst file.
+        result_rst = RstCloth()
+        result_rst.title("Test Result Table")
+        result_rst.newline()
+        result_rst._add(tabulate([(x['name'], x['setup'], x.get('call', "NOTRUN"), x.get('teardown', "NOTRUN"))
+                                  for x in results],
+                                 headers=RESULTS_HEADER,
+                                 tablefmt='rst'))
+        result_rst.newline(2)
+        result_rst._add(".. |passed| image:: images/passed.png ")
+        result_rst.newline()
+        result_rst._add(".. |failed| image:: images/failed.png ")
+        result_rst.newline()
+        result_rst.write(os.path.join(session.config.getoption("rst_dir"),
+                                      "overview.rst"))
 
-    # Todo: Write a test log data rst.
-    # Theoretically, this should let us put it as an appendix in Latext. Having it generate
-    # single RST files like overview & logdata will allow users (aka me) to customize how the generated TOC
-    # and such is done.
+        # Todo: Write a test log data rst.
+        # Theoretically, this should let us put it as an appendix in Latext. Having it generate
+        # single RST files like overview & logdata will allow users (aka me) to customize how the generated TOC
+        # and such is done.
 
 
 def pytest_addoption(parser):
@@ -607,9 +612,9 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
-    if os.path.exists(path.join(config.getoption('rst_dir'), "logs")):
-        shutil.rmtree(path.join(config.getoption('rst_dir'), "logs"))
-
+    if config.getoption("rst_dir"):
+        if os.path.exists(path.join(config.getoption('rst_dir'), "logs")):
+            shutil.rmtree(path.join(config.getoption('rst_dir'), "logs"))
 
 
 def doc_result(fixture):
