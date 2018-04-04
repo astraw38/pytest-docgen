@@ -20,6 +20,16 @@ def auth_session(request):
     LOG.debug("Destroying auth_session w/ param %s", request.param)
 
 
+@pytest.fixture()
+def failing_fixture():
+    """
+    THis fixture will fail during setup.
+    """
+    assert False, "Failed!"
+    yield
+    assert False, "Failed in teardown!"
+
+
 class TestRSABounds(object):
     """
     RSA Bound checking.
@@ -46,3 +56,4 @@ class TestRSABounds(object):
         """
         LOG.debug("Call: test_bad_modulus_failing")
         assert "False" == "This isn't really false"
+

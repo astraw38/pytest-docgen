@@ -6,14 +6,14 @@
 
 """
 import os
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict
 
 import pytest
 import inspect
 
 import shutil
 
-from _pytest.logging import LogCaptureFixture
+import re
 from _pytest.main import Session
 from _pytest.python import Instance
 from os import path
@@ -77,6 +77,10 @@ class NodeDocCollector(object):
                  source_obj=None,
                  log_location=None):
         self.node_id = node_id.replace(":", "_")
+        cut_dir = pytest.config.getoption("rst_cut_dir")
+        if cut_dir and level == "module":
+            rex = re.compile(r"^{}[.\\/]".format(cut_dir))
+            node_name = rex.sub("", node_name, 1)
         self.node_name = node_name
         self.node_doc = node_doc
         self.write_toc = write_toc
@@ -112,7 +116,7 @@ class NodeDocCollector(object):
 
     def _build_fixtures(self, rst):
         rst.directive(name="topic",
-                      arg="{}{} Fixtures".format(self.level[0].upper(), self.level[1:]))
+                      arg="{}{} Preconditions".format(self.level[0].upper(), self.level[1:]))
         rst.newline()
 
         for fixture_name, fixture_doc, fixture_result in self._fixtures:
@@ -609,6 +613,10 @@ def pytest_addoption(parser):
                     help="Include source code for the test itself.",
                     action="store_true",
                     default=True)
+    group.addoption("--rst-cut-dir",
+                    dest="rst_cut_dir",
+                    help="Trim document node names",
+                    action="store")
 
 
 def pytest_configure(config):
