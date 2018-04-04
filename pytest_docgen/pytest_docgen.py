@@ -76,11 +76,13 @@ class NodeDocCollector(object):
                  source_file=None,
                  source_obj=None,
                  log_location=None):
-        self.node_id = node_id.replace(":", "_")
         cut_dir = pytest.config.getoption("rst_cut_dir")
-        if cut_dir and level == "module":
+        if cut_dir:
             rex = re.compile(r"^{}[.\\/]".format(cut_dir))
             node_name = rex.sub("", node_name, 1)
+            node_id = rex.sub("", node_id, 1)
+
+        self.node_id = node_id.replace(":", "_")
         self.node_name = node_name
         self.node_doc = node_doc
         self.write_toc = write_toc
