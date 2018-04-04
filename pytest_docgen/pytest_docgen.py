@@ -481,7 +481,7 @@ def pytest_fixture_setup(fixturedef, request):
             res = str(outcome.get_result())
         try:
             doccol = request.node._doccol
-            doccol.add_fixture(fixturedef, request.param_index, res)
+            doccol.add_fixture(fixturedef, request.param_index, outcome.result)
         except Exception as exc:
             # TODO: Ignoring exceptions for now, but we should probably handle
             # them more gracefully.

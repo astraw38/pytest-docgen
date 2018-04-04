@@ -6,6 +6,11 @@ import pytest
 from pytest_docgen.pytest_docgen import doc_result
 
 
+@pytest.fixture(scope="module", autouse=True)
+def yield_nothing_fixture():
+    yield b""
+
+
 @doc_result
 @pytest.fixture(scope="class")
 def auth_session(request):
