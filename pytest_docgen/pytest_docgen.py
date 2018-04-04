@@ -569,10 +569,6 @@ def pytest_sessionfinish(session):
                                  headers=RESULTS_HEADER,
                                  tablefmt='rst'))
         result_rst.newline(2)
-        result_rst._add(".. |passed| image:: images/passed.png ")
-        result_rst.newline()
-        result_rst._add(".. |failed| image:: images/failed.png ")
-        result_rst.newline()
         result_rst.write(os.path.join(session.config.getoption("rst_dir"),
                                       "overview.rst"))
 
