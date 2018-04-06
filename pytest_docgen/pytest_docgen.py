@@ -128,8 +128,9 @@ class NodeDocCollector(object):
                            wrap=False)  # Note: indent is 3 here so that it shows up under the Fixtures panel.
 
             if fixture_result:
-                rst.content(["", "**Fixture Result Value**:", ""], indent=3)
+                rst.content(["", "**Fixture Result Value**:", ""], indent=6)
                 rst.codeblock(str(fixture_result),
+                              language="bash",
                               indent=6)  # indent = 6, 3 from fixture panel, 3 from definition
         rst.newline()
 
