@@ -8,7 +8,9 @@ from pytest_docgen.pytest_docgen import doc_result
 
 @pytest.fixture(scope="module", autouse=True)
 def yield_nothing_fixture():
-    yield b""
+    print("Fixture setup: auth_session")
+    yield b"This is a test fixture\nwith\nnew\nlines"
+    print("Fixture teardown: auth_session")
 
 
 @doc_result
@@ -38,7 +40,7 @@ def auth_session(request):
     :return: Allocated :class:`~LunaTAP.core.client.node.ClientNode`
     """
     print("Fixture setup: auth_session")
-    yield "This is a test fixture"
+    yield "This is a test fixture\nwith\nnew\nlines"
     print("Fixture teardown: auth_session")
 
 def test_module_level_test():

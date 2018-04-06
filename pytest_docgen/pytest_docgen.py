@@ -129,8 +129,15 @@ class NodeDocCollector(object):
 
             if fixture_result:
                 rst.content(["", "**Fixture Result Value**:", ""], indent=6)
-                rst.codeblock(str(fixture_result),
-                              language="bash",
+                if isinstance(fixture_result, str):
+                    to_write = fixture_result.splitlines()
+                elif isinstance(fixture_result, bytes):
+                    to_write = fixture_result.decode('utf-8').splitlines()
+                else:
+                    to_write = str(fixture_result).splitlines()
+                rst.directive(content=to_write,
+                              name="code-block",
+                              arg="bash",
                               indent=6)  # indent = 6, 3 from fixture panel, 3 from definition
         rst.newline()
 
