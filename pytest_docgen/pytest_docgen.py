@@ -122,12 +122,15 @@ class NodeDocCollector(object):
         rst.newline()
 
         for fixture_name, fixture_doc, fixture_result in self._fixtures:
-            if fixture_result:
-                fixture_doc.extend(["", "**Fixture Result Value**: ``{}``".format(fixture_result)])
             rst.definition(name=fixture_name,
                            text="\n".join(fixture_doc),
                            indent=3,
                            wrap=False)  # Note: indent is 3 here so that it shows up under the Fixtures panel.
+
+            if fixture_result:
+                rst.content(["", "**Fixture Result Value**:", ""], indent=3)
+                rst.codeblock(str(fixture_result),
+                              indent=6)  # indent = 6, 3 from fixture panel, 3 from definition
         rst.newline()
 
     def _build_source_link(self, rst):
@@ -232,10 +235,6 @@ class NodeDocCollector(object):
         :param str filename: File to write.
         """
         rst = self._build()
-        rst._add(".. |passed| image:: images/passed.png ")
-        rst.newline()
-        rst._add(".. |failed| image:: images/failed.png ")
-        rst.newline()
         rst.write(filename)
 
     def add_fixture(self, fixturedef, param_index=0, result=None):
