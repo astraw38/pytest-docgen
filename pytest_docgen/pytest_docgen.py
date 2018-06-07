@@ -132,7 +132,10 @@ class NodeDocCollector(object):
                 if isinstance(fixture_result, str):
                     to_write = fixture_result.splitlines()
                 elif isinstance(fixture_result, bytes):
-                    to_write = fixture_result.decode('utf-8').splitlines()
+                    try:
+                        to_write = fixture_result.decode('utf-8').splitlines()
+                    except UnicodeDecodeError:
+                        to_write = ["<undecodeable binary_data>"]
                 else:
                     to_write = str(fixture_result).splitlines()
                 rst.directive(content=to_write,
