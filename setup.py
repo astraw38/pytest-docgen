@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name="pytest-docgen",
     packages=['pytest_docgen'],
-    version="1.0.0",
+    version="1.0.1",
     # the following makes a plugin available to pytest
     entry_points={
         'pytest11': [
