@@ -19,6 +19,13 @@ from _pytest.python import Instance
 from os import path
 from rstcloth.rstcloth import RstCloth
 
+try:
+    from _pytest.python import Package
+except ImportError:
+    # pre-3.7.0 package wasn't a level that mattered
+    class Package(object):
+        pass
+
 # There are 4 levels we care about
 # Level 0 ::    session     :: =====
 # Level 1 ::    module      :: ------
@@ -393,6 +400,23 @@ def doccollect_parent(item, prev_item=None):
     If there is a pre-existing parent DocCollector, we will append the *current* DocCollector as a child of the parent.
     This ensures that structure of the final documents is correct.
 
+    Original pytest structure::
+
+        Session
+            Package ( new in pytest 3.7.0 )
+                [...] -- this can be multiple packages above a module before we get to
+                         a session
+                Module
+                    Function (opt)
+                    Class (opt)
+                        Function
+                    Class
+                        Function
+                Module
+                    [...]
+            Package
+                [...]
+
     Sample final structure::
 
         Session
@@ -411,6 +435,13 @@ def doccollect_parent(item, prev_item=None):
     """
     if not prev_item:
         prev_item = item
+
+    # there can be multiple packages in a row between module & session. Preserve the module, skip collecting the
+    # packages
+    if isinstance(item.parent, Package):
+        doccollect_parent(item.parent, prev_item)
+        return
+
     if isinstance(item.parent, Session):
         # End recursion -- we hit the top level
         if prev_item._doccol not in item.parent.doc_collectors:
@@ -459,7 +490,8 @@ def pytest_collection_modifyitems(session, config, items):
                 prefix = ""
             test_doccol = NodeDocCollector(node_name=test.name,
                                            node_doc=test.obj.__doc__,
-                                           node_id=test.nodeid,
+                                           node_id="{}{}".format(test.session.config.getoption("rst_label_prefix"),
+                                                                 test.nodeid),
                                            level="function",
                                            source_file=path.relpath(str(test.fspath),
                                                                     test.session.config.getoption("rst_dir")),
@@ -625,6 +657,11 @@ def pytest_addoption(parser):
                     dest="rst_cut_dir",
                     help="Trim document node names",
                     action="store")
+    group.addoption("--rst-label-prefix",
+                    dest="rst_label_prefix",
+                    help="Text to prepend to generated test labels",
+                    action="store",
+                    default="")
 
 
 def pytest_configure(config):
