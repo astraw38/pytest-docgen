@@ -457,7 +457,8 @@ def doccollect_parent(item, prev_item=None):
         level = get_level(parent)
         doccol = NodeDocCollector(parent.obj.__name__,
                                   parent.obj.__doc__,
-                                  parent.nodeid,
+                                  "{}{}".format(item.session.config.getoption("rst_label_prefix"),
+                                                parent.nodeid),
                                   level=level,
                                   write_toc=level == "module", )
         parent._doccol = doccol
