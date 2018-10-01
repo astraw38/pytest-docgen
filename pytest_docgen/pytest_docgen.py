@@ -164,8 +164,11 @@ class NodeDocCollector(object):
 
     def _build_results(self, rst):
         res = self.get_simple_results()
-        table_results = [[res['setup'], res.get('call', "NOTRUN"), res.get('teardown', "NOTRUN")]]
-        rst_table = tabulate(table_results, ["Setup", "Call", "Teardown"],
+
+        table_results = [["Setup", res['setup']],
+                         ["Execution", res.get('call', "NOTRUN")],
+                         ["Teardown", res.get("teardown", "NOTRUN")]]
+        rst_table = tabulate(table_results, ["Stage", "Outcome"],
                              tablefmt="rst")
         rst.h5("Results")
         rst.newline()
