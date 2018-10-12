@@ -225,17 +225,18 @@ class NodeDocCollector(object):
         rst.content(doc_prep(self.node_doc))
         rst.newline()
 
-        if self._fixtures:
-            self._build_fixtures(rst)
+        if self.source_file:
+            self._build_source_link(rst)
 
         if self._results:
             self._build_results(rst)
 
+        if self._fixtures:
+            self._build_fixtures(rst)
+
         if self.write_logs:
             self._build_logs(rst)
 
-        if self.source_file:
-            self._build_source_link(rst)
 
         for subdoc in self.children:
             rst._add(subdoc.emit())
@@ -524,14 +525,13 @@ def pytest_fixture_setup(fixturedef, request):
             # Note: force the result to be a string. We don't want to be keeping around possibly very large
             # objects that might be returned by fixtures. Also it ensures that we capture the state of the fixture
             # *now* after setup is done, rather than what it might be at the time of the doc generation (end of test run)
-            res = str(outcome.get_result())
-        try:
-            doccol = request.node._doccol
-            doccol.add_fixture(fixturedef, request.param_index, outcome.result)
-        except Exception as exc:
-            # TODO: Ignoring exceptions for now, but we should probably handle
-            # them more gracefully.
-            pass
+            try:
+                doccol = request.node._doccol
+                doccol.add_fixture(fixturedef, request.param_index, outcome.result)
+            except Exception as exc:
+                # TODO: Ignoring exceptions for now, but we should probably handle
+                # them more gracefully.
+                pass
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -652,7 +652,7 @@ def pytest_addoption(parser):
                          "can be enabled on a per-fixture bases with the `@doc_result` decorator",
                     dest="rst_fixture_results",
                     action="store_true",
-                    default=True)
+                    default=False)
     group.addoption("--rst-include-src",
                     help="Include source code for the test itself.",
                     action="store_true",

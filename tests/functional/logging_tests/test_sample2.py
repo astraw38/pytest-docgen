@@ -4,10 +4,13 @@ Test file for preconditions & the like
 import logging
 import pytest
 
+from pytest_docgen.pytest_docgen import doc_result
+
 LOG = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="class", params=["p1", "p2"])
+@doc_result
 def auth_session(request):
     """
     Login to a Token and return the authenticated session handle.
