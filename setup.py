@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name="pytest-docgen",
-    packages=['pytest_docgen'],
+    packages=['pytest_docgen', 'pytest_docgen.sphinxext'],
     py_modules=[splitext(basename(i))[0] for i in glob.glob('pytest_docgen/sphinxext')],
     version="1.1.0",
     # the following makes a plugin available to pytest
