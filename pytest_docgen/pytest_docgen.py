@@ -191,12 +191,19 @@ class NodeDocCollector(object):
         for when, data in self.log_data.items():
             rst.content(rst.bold(when))
             rst.newline()
+            rst.directive("collapsible-block",
+                          fields=[("heading", when)])
+
+            rst.newline()
             rst.codeblock(content=data.splitlines(),
-                          language="none")
+                          language="none",
+                          indent=3)
             rst.newline()
 
         if self.capture_start != self.capture_end:
             rst.content(rst.bold("Captured Output"))
+            rst.newline()
+            rst.directive("collapsible-block")
             rst.newline()
             rst.directive("literalinclude",
                           # Note: popping off the top-level directory, as that's the top level rst_dir

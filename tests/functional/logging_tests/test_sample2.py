@@ -9,8 +9,8 @@ from pytest_docgen.pytest_docgen import doc_result
 LOG = logging.getLogger(__name__)
 
 
-@pytest.fixture(scope="class", params=["p1", "p2"])
 @doc_result
+@pytest.fixture(scope="class", params=["p1", "p2"])
 def auth_session(request):
     """
     Login to a Token and return the authenticated session handle.
