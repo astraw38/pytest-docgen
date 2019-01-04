@@ -101,7 +101,7 @@ class CollapsibleBlock(Directive):
 
         node = collapsible_block('\n'.join(self.content))
         node['heading'] = self.options.get('heading', 'Collapse')
-        # node['target_id'] = target_id
+        node['target_id'] = target_id
 
         self.state.nested_parse(self.content, self.content_offset, node)
 
