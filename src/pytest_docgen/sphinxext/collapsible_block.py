@@ -51,7 +51,6 @@ from os.path import basename
 
 # External imports
 from docutils import nodes
-from docutils.parsers.rst.directives import unchanged
 from jinja2 import Environment, PackageLoader
 
 _env = Environment(loader=PackageLoader('pytest_docgen.sphinxext', '_templates'))

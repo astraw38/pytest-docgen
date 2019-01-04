@@ -3,7 +3,7 @@ Test file for preconditions & the like
 """
 import pytest
 
-from pytest_docgen.pytest_docgen import doc_result
+from src.pytest_docgen import doc_result
 
 
 @pytest.fixture(scope="module", autouse=True)
