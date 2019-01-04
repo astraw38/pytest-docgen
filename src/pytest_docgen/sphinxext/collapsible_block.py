@@ -39,6 +39,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 
 from docutils.parsers.rst import Directive
+from docutils.parsers.rst.directives import unchanged
 
 log = logging.getLogger(__name__)
 
@@ -86,9 +87,6 @@ class collapsible_block(nodes.General, nodes.Element):
 class CollapsibleBlock(Directive):
     has_content = True
 
-    #option_spec = Directive.option_spec
-    #option_spec.update(heading=unchanged)
-
     def run(self):
         env = self.state.document.settings.env
 
@@ -100,11 +98,11 @@ class CollapsibleBlock(Directive):
         target_node = nodes.target('', '', ids=[target_id])
 
         node = collapsible_block('\n'.join(self.content))
-        node['heading'] = self.options.get('heading', 'Collapse')
-        node['target_id'] = target_id
 
         self.state.nested_parse(self.content, self.content_offset, node)
 
+        node['heading'] = self.options.get('heading', 'Collapse')
+        node['target_id'] = target_id
         # cb = Directive.run(self)
         # node.setup_child(cb[0])
         # node.children.append(cb[0])
@@ -134,3 +132,5 @@ def setup(app):
         )
     )
     app.add_directive('collapsible-block', CollapsibleBlock)
+    app.add_javascript('js/main.js')
+    app.add_stylesheet('css/main.css')
