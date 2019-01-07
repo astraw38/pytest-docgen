@@ -87,8 +87,7 @@ class collapsible_block(nodes.General, nodes.Element):
 class CollapsibleBlock(Directive):
     has_content = True
 
-    option_spec = Directive.option_spec
-    option_spec.update(heading=unchanged)
+    option_spec = {"heading": unchanged}
 
     def run(self):
         env = self.state.document.settings.env
