@@ -103,11 +103,8 @@ class CollapsibleBlock(Directive):
 
         self.state.nested_parse(self.content, self.content_offset, node)
 
-        node['heading'] = self.options.get('heading', 'Collapse')
+        node['heading'] = self.options.pop('heading', 'Collapse')
         node['target_id'] = target_id
-        # cb = Directive.run(self)
-        # node.setup_child(cb[0])
-        # node.children.append(cb[0])
 
         return [target_node, node]
 
