@@ -1,0 +1,3 @@
+include src/pytest_docgen/sphinxext/_templates/*.html
+include src/pytest_docgen/sphinxext/_static/css/*.css
+include src/pytest_docgen/sphinxext/_static/js/*.js

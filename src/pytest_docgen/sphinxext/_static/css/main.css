@@ -1,0 +1,29 @@
+
+.expander .expander-trigger {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    color: #eb2a82;
+    cursor: pointer;
+    display: block;
+    font-size: 1em;
+    margin-bottom: 1em;
+    padding-bottom: .25em;
+    text-decoration: none
+}
+
+.expander .expander-trigger:before {
+    font-size: .7em;
+    content: "\25BC";
+    margin-right: 0.5em
+}
+
+.expander .expander-hidden:before {
+    font-size: .7em;
+    content: "\25BA"
+}
+
+.expander .expander-hidden + .expander-content {
+    display: none
+}
