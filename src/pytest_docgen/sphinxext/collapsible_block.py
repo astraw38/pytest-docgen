@@ -87,13 +87,16 @@ class collapsible_block(nodes.General, nodes.Element):
 class CollapsibleBlock(Directive):
     has_content = True
 
+    option_spec = Directive.option_spec
+    option_spec.update(heading=unchanged)
+
     def run(self):
         env = self.state.document.settings.env
 
         rst_source = self.state_machine.node.document['source']
         rst_filename = basename(rst_source)
 
-        target_id = "%s.ccb-%d" % (rst_filename, env.new_serialno('bokeh-plot'))
+        target_id = "%s.ccb-%d" % (rst_filename, env.new_serialno())
         target_id = target_id.replace(".", "-")
         target_node = nodes.target('', '', ids=[target_id])
 
