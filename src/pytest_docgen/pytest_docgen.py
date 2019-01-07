@@ -155,6 +155,7 @@ class NodeDocCollector(object):
 
         rst.h5("Source Code")
         rst.newline()
+        rst.directive("collapsible-block")
         rst.directive("literalinclude",
                       arg=self.source_file,
                       # Just do raw lines. We could do the pyobject though....
@@ -189,8 +190,6 @@ class NodeDocCollector(object):
         rst.newline()
 
         for when, data in self.log_data.items():
-            rst.content(rst.bold(when))
-            rst.newline()
             rst.directive("collapsible-block",
                           fields=[("heading", when)])
 
@@ -232,11 +231,11 @@ class NodeDocCollector(object):
         rst.content(doc_prep(self.node_doc))
         rst.newline()
 
-        if self.source_file:
-            self._build_source_link(rst)
-
         if self._results:
             self._build_results(rst)
+
+        if self.source_file:
+            self._build_source_link(rst)
 
         if self._fixtures:
             self._build_fixtures(rst)

@@ -1,5 +1,5 @@
 import pytest
-from src.pytest_docgen import doc_prep
+from pytest_docgen import doc_prep
 
 
 DOCPREP_TESTDATA =[

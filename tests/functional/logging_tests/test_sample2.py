@@ -4,7 +4,7 @@ Test file for preconditions & the like
 import logging
 import pytest
 
-from src.pytest_docgen import doc_result
+from pytest_docgen.pytest_docgen import doc_result
 
 LOG = logging.getLogger(__name__)
 

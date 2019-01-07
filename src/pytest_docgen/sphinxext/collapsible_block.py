@@ -85,11 +85,11 @@ class collapsible_block(nodes.General, nodes.Element):
 
 
 class CollapsibleBlock(Directive):
+    option_spec = {"heading": unchanged}
     has_content = True
 
-    option_spec = {"heading": unchanged}
-
     def run(self):
+        self.assert_has_content()
         env = self.state.document.settings.env
 
         rst_source = self.state_machine.node.document['source']
