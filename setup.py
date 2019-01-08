@@ -5,7 +5,7 @@ setup(
     packages=find_packages('src'),
     package_dir={'': 'src'},
     include_package_data=True,
-    version="1.1.0",
+    version="1.1.1",
     description="An RST Documentation Generator for pytest-based test suites",
     maintainer="Ashley Straw",
     maintainer_email="as.fireflash38@gmail.com",
@@ -13,7 +13,7 @@ setup(
     author_email="as.fireflash38@gmail.com",
     keywords=["pytest", "sphinx", "rst", "testing"],
     url="https://github.com/astraw38/pytest-docgen",
-    download_url="https://github.com/astraw38/pytest-docgen/tarball/v1.1.0/",
+    download_url="https://github.com/astraw38/pytest-docgen/tarball/v1.1.1/",
     # the following makes a plugin available to pytest
     entry_points={
         'pytest11': [

@@ -38,8 +38,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 
+import os
 from docutils.parsers.rst import Directive
 from docutils.parsers.rst.directives import unchanged
+from sphinx.util.fileutil import copy_asset
+
 
 log = logging.getLogger(__name__)
 
@@ -70,6 +73,10 @@ __all__ = (
     'html_visit_collapsible_block',
     'setup',
 )
+
+_EXT_STATIC = os.path.join(os.path.dirname(__file__), "_static")
+_JS_ASSETS = [os.path.join(_EXT_STATIC, 'js', 'collapsible_block.js')]
+_CSS_ASSETS = [os.path.join(_EXT_STATIC, 'css', 'collapsible_block.css')]
 
 
 # -----------------------------------------------------------------------------
@@ -122,6 +129,14 @@ def html_depart_collapsible_block(self, node):
     self.body.append(CCB_EPILOGUE.render())
 
 
+
+def copy_asset_files(app, exc):
+    asset_files = _JS_ASSETS + _CSS_ASSETS
+    if exc is None:  # build succeeded
+        for path in asset_files:
+            copy_asset(path, os.path.join(app.outdir, '_static'))
+
+
 def setup(app):
     app.add_node(
         collapsible_block,
@@ -131,5 +146,7 @@ def setup(app):
         )
     )
     app.add_directive('collapsible-block', CollapsibleBlock)
-    app.add_javascript('js/main.js')
-    app.add_stylesheet('css/main.css')
+    app.connect('build-finished', copy_asset_files)
+
+    app.add_javascript('collapsible_block.js')
+    app.add_stylesheet('collapsible_block.css')
