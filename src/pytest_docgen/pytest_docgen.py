@@ -26,6 +26,7 @@ except ImportError:
     class Package(object):
         pass
 
+
 # There are 4 levels we care about
 # Level 0 ::    session     :: =====
 # Level 1 ::    module      :: ------
@@ -33,13 +34,8 @@ except ImportError:
 # Level 3 ::    function    :: ++++++
 from tabulate import tabulate
 
-SESSION_HEADER_MAP = {
-    "session": "h1",
-    "module": "h2",
-    "class": "h3",
-    "function": "h4"
-}
-RESULTS_HEADER = ['Test Name', 'Setup', "Call", "Teardown"]
+SESSION_HEADER_MAP = {"session": "h1", "module": "h2", "class": "h3", "function": "h4"}
+RESULTS_HEADER = ["Test Name", "Setup", "Call", "Teardown"]
 
 
 def _pop_top_dir(path):
@@ -74,16 +70,19 @@ def doc_prep(docstring):
 
 
 class NodeDocCollector(object):
-    def __init__(self,
-                 node_name,
-                 node_doc,
-                 node_id,
-                 level="session",
-                 write_toc=False,
-                 source_file=None,
-                 source_obj=None,
-                 log_location=None):
-        cut_dir = pytest.config.getoption("rst_cut_dir")
+    def __init__(
+        self,
+        node_name,
+        node_doc,
+        node_id,
+        level="session",
+        write_toc=False,
+        source_file=None,
+        source_obj=None,
+        log_location=None,
+        config=None,
+    ):
+        cut_dir = config.getoption("rst_cut_dir")
         if cut_dir:
             rex = re.compile(r"^{}[.\\/]".format(cut_dir))
             node_name = rex.sub("", node_name, 1)
@@ -112,27 +111,29 @@ class NodeDocCollector(object):
             os.makedirs(log_dir, exist_ok=True)
 
     def __str__(self):
-        return "NodeDocCollector(name=%s, level=%s, children=%d)" % (self.node_name, self.level, len(self.children))
+        return "NodeDocCollector(name=%s, level=%s, children=%d)" % (
+            self.node_name,
+            self.level,
+            len(self.children),
+        )
 
     def _build_toc(self, rst):
-        rst.directive(name="toctree",
-                      fields=[('hidden', ''),
-                              ('includehidden', '')])
+        rst.directive(name="toctree", fields=[("hidden", ""), ("includehidden", "")])
         rst.newline()
 
         rst.directive(name="contents")
         rst.newline(2)
 
     def _build_fixtures(self, rst):
-        rst.directive(name="topic",
-                      arg="{}{} Preconditions".format(self.level[0].upper(), self.level[1:]))
+        rst.directive(
+            name="topic", arg="{}{} Preconditions".format(self.level[0].upper(), self.level[1:])
+        )
         rst.newline()
 
         for fixture_name, fixture_doc, fixture_result in self._fixtures:
-            rst.definition(name=fixture_name,
-                           text="\n".join(fixture_doc),
-                           indent=3,
-                           wrap=False)  # Note: indent is 3 here so that it shows up under the Fixtures panel.
+            rst.definition(
+                name=fixture_name, text="\n".join(fixture_doc), indent=3, wrap=False
+            )  # Note: indent is 3 here so that it shows up under the Fixtures panel.
 
             if fixture_result:
                 rst.content(["", "**Fixture Result Value**:", ""], indent=6)
@@ -140,15 +141,14 @@ class NodeDocCollector(object):
                     to_write = fixture_result.splitlines()
                 elif isinstance(fixture_result, bytes):
                     try:
-                        to_write = fixture_result.decode('utf-8').splitlines()
+                        to_write = fixture_result.decode("utf-8").splitlines()
                     except UnicodeDecodeError:
                         to_write = ["<undecodeable binary_data>"]
                 else:
                     to_write = str(fixture_result).splitlines()
-                rst.directive(content=to_write,
-                              name="code-block",
-                              arg="bash",
-                              indent=6)  # indent = 6, 3 from fixture panel, 3 from definition
+                rst.directive(
+                    content=to_write, name="code-block", arg="bash", indent=6
+                )  # indent = 6, 3 from fixture panel, 3 from definition
         rst.newline()
 
     def _build_source_link(self, rst):
@@ -156,21 +156,24 @@ class NodeDocCollector(object):
         rst.h5("Source Code")
         rst.newline()
         rst.directive("collapsible-block")
-        rst.directive("literalinclude",
-                      arg=self.source_file,
-                      # Just do raw lines. We could do the pyobject though....
-                      fields=[("pyobject", self.source_obj)],
-                      indent=3)
+        rst.directive(
+            "literalinclude",
+            arg=self.source_file,
+            # Just do raw lines. We could do the pyobject though....
+            fields=[("pyobject", self.source_obj)],
+            indent=3,
+        )
         rst.newline()
 
     def _build_results(self, rst):
         res = self.get_simple_results()
 
-        table_results = [["Setup", res['setup']],
-                         ["Execution", res.get('call', "NOTRUN")],
-                         ["Teardown", res.get("teardown", "NOTRUN")]]
-        rst_table = tabulate(table_results, ["Stage", "Outcome"],
-                             tablefmt="rst")
+        table_results = [
+            ["Setup", res["setup"]],
+            ["Execution", res.get("call", "NOTRUN")],
+            ["Teardown", res.get("teardown", "NOTRUN")],
+        ]
+        rst_table = tabulate(table_results, ["Stage", "Outcome"], tablefmt="rst")
         rst.h5("Results")
         rst.newline()
         rst._add(rst_table)
@@ -181,8 +184,7 @@ class NodeDocCollector(object):
                 continue
             else:
                 rst.h5("{} Failure Details".format(when))
-                rst.codeblock(content=outcome,
-                              language="python")
+                rst.codeblock(content=outcome, language="python")
         rst.newline()
 
     def _build_logs(self, rst):
@@ -190,13 +192,10 @@ class NodeDocCollector(object):
         rst.newline()
 
         for when, data in self.log_data.items():
-            rst.directive("collapsible-block",
-                          fields=[("heading", when)])
+            rst.directive("collapsible-block", fields=[("heading", when)])
 
             rst.newline()
-            rst.codeblock(content=data.splitlines(),
-                          language="none",
-                          indent=3)
+            rst.codeblock(content=data.splitlines(), language="none", indent=3)
             rst.newline()
 
         if self.capture_start != self.capture_end:
@@ -204,12 +203,14 @@ class NodeDocCollector(object):
             rst.newline()
             rst.directive("collapsible-block")
             rst.newline()
-            rst.directive("literalinclude",
-                          # Note: popping off the top-level directory, as that's the top level rst_dir
-                          arg="{}.log".format(_pop_top_dir(self.log_location)),
-                          # Just do raw lines. We could do the pyobject though....
-                          fields=[("lines", "{}-{}".format(self.capture_start, self.capture_end))],
-                          indent=3)
+            rst.directive(
+                "literalinclude",
+                # Note: popping off the top-level directory, as that's the top level rst_dir
+                arg="{}.log".format(_pop_top_dir(self.log_location)),
+                # Just do raw lines. We could do the pyobject though....
+                fields=[("lines", "{}-{}".format(self.capture_start, self.capture_end))],
+                indent=3,
+            )
             rst.newline()
 
     def _build(self):
@@ -242,7 +243,6 @@ class NodeDocCollector(object):
 
         if self.write_logs:
             self._build_logs(rst)
-
 
         for subdoc in self.children:
             rst._add(subdoc.emit())
@@ -312,12 +312,12 @@ class NodeDocCollector(object):
                 log.write("{0} Captured stdout {0}\n".format("=" * 20))
                 log.write(capstdout)
                 log.write("{0} End stdout {0}\n".format("=" * 20))
-                self.capture_end += capstdout.count('\n') + 1
+                self.capture_end += capstdout.count("\n") + 1
             if capstderr:
                 log.write("{0} Captured stdout {0}\n".format("=" * 20))
                 log.write(capstderr)
                 log.write("{0} End stdout {0}\n".format("=" * 20))
-                self.capture_end += capstderr.count('\n') + 1
+                self.capture_end += capstderr.count("\n") + 1
 
     def add_result(self, result):
         """
@@ -330,7 +330,7 @@ class NodeDocCollector(object):
         if result.outcome != "passed":
             # Store the longrepr
             # TODO: This might need to do some munging on the data.
-            outcome = ["".join(["   ", x]) for x in result.longreprtext.split('\n')]
+            outcome = ["".join(["   ", x]) for x in result.longreprtext.split("\n")]
         else:
             outcome = result.outcome.upper()
 
@@ -354,7 +354,7 @@ class NodeDocCollector(object):
         # thie should ideally call any sub-collectors... right?
         # We want the node name to also include a link ideally.
         if self._results:
-            results = {'name': ':ref:`{} <{}>`'.format(self.node_name, self.node_id)}
+            results = {"name": ":ref:`{} <{}>`".format(self.node_name, self.node_id)}
             for when, outcome in self._results:
                 simple_outcome = "".join(outcome)
                 if "PASSED" in simple_outcome:
@@ -465,12 +465,14 @@ def doccollect_parent(item, prev_item=None):
     doccol = getattr(parent, "_doccol", None)
     if doccol is None:
         level = get_level(parent)
-        doccol = NodeDocCollector(parent.obj.__name__,
-                                  parent.obj.__doc__,
-                                  "{}{}".format(item.session.config.getoption("rst_label_prefix"),
-                                                parent.nodeid),
-                                  level=level,
-                                  write_toc=level == "module", )
+        doccol = NodeDocCollector(
+            parent.obj.__name__,
+            parent.obj.__doc__,
+            "{}{}".format(item.session.config.getoption("rst_label_prefix"), parent.nodeid),
+            level=level,
+            write_toc=level == "module",
+            config=item.session.config,
+        )
         parent._doccol = doccol
 
     if prev_item._doccol not in doccol.children:
@@ -499,21 +501,28 @@ def pytest_collection_modifyitems(session, config, items):
                 prefix = test.cls.__name__ + "."
             else:
                 prefix = ""
-            test_doccol = NodeDocCollector(node_name=test.name,
-                                           node_doc=test.obj.__doc__,
-                                           node_id="{}{}".format(test.session.config.getoption("rst_label_prefix"),
-                                                                 test.nodeid),
-                                           level="function",
-                                           source_file=path.relpath(str(test.fspath),
-                                                                    test.session.config.getoption("rst_dir")),
-                                           source_obj="{}{}".format(prefix, test.obj.__name__),
-                                           # Log location right now is **directory printing_tests**.
-                                           # That's because we use the test.location, which is a direct path to the
-                                           # test file from the test root.
-                                           # This could be changed to be a flat structure if we wanted.
-                                           log_location=path.join(test.session.config.getoption("rst_dir"),
-                                                                  "logs",
-                                                                  test.location[0].replace('.py', '.log')))
+            test_doccol = NodeDocCollector(
+                node_name=test.name,
+                node_doc=test.obj.__doc__,
+                node_id="{}{}".format(
+                    test.session.config.getoption("rst_label_prefix"), test.nodeid
+                ),
+                level="function",
+                source_file=path.relpath(
+                    str(test.fspath), test.session.config.getoption("rst_dir")
+                ),
+                source_obj="{}{}".format(prefix, test.obj.__name__),
+                # Log location right now is **directory printing_tests**.
+                # That's because we use the test.location, which is a direct path to the
+                # test file from the test root.
+                # This could be changed to be a flat structure if we wanted.
+                log_location=path.join(
+                    test.session.config.getoption("rst_dir"),
+                    "logs",
+                    test.location[0].replace(".py", ".log"),
+                ),
+                config=config,
+            )
             test._doccol = test_doccol
             doccollect_parent(test)
 
@@ -527,16 +536,18 @@ def pytest_fixture_setup(fixturedef, request):
     outcome = yield
     res = None
     if request.config.getoption("rst_dir"):
-        if request.config.getoption("rst_fixture_results", None) or getattr(fixturedef.func, "_doc_result", False):
+        if request.config.getoption("rst_fixture_results", None) or getattr(
+            fixturedef.func, "_doc_result", False
+        ):
             # Note: force the result to be a string. We don't want to be keeping around possibly very large
             # objects that might be returned by fixtures. Also it ensures that we capture the state of the fixture
             # *now* after setup is done, rather than what it might be at the time of the doc generation (end of test run)
             try:
                 doccol = request.node._doccol
-                doccol.add_fixture(fixturedef, request.param_index, outcome.result)
+                doccol.add_fixture(fixturedef, request.param_index, outcome.get_result())
             except Exception as exc:
                 # TODO: Ignoring exceptions for now, but we should probably handle
-                # them more gracefully.
+                #  them more gracefully.
                 pass
 
 
@@ -551,32 +562,28 @@ def pytest_runtest_makereport(item, call):
         doccol = item._doccol
         doccol.add_result(res)
         if res.when == "teardown":
-            doccol.add_capture(capstdout=res.capstdout,
-                               capstderr=res.capstderr)
+            doccol.add_capture(capstdout=res.capstdout, capstderr=res.capstderr)
 
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_setup(item):
     yield
     if item.session.config.getoption("rst_dir"):
-        item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(),
-                                 'setup')
+        item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(), "setup")
 
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_call(item):
     yield
     if item.session.config.getoption("rst_dir"):
-        item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(),
-                                 'call')
+        item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(), "call")
 
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_teardown(item):
     yield
     if item.session.config.getoption("rst_dir"):
-        item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(),
-                                 'teardown')
+        item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(), "teardown")
 
 
 def pytest_sessionstart(session):
@@ -598,31 +605,36 @@ def pytest_sessionfinish(session):
             index.newline()
             index.content(session.config.getoption("rst_desc", ""))
             index.newline()
-            index.directive(name="toctree",
-                            fields=[("includehidden", ""), ("glob", "")])
+            index.directive(name="toctree", fields=[("includehidden", ""), ("glob", "")])
             index.newline()
             index.content(["*"], 3)
             index.newline(2)
+            index.write(os.path.join(session.config.getoption("rst_dir"), "index.rst"))
 
         results = []
 
         for doc_collector in getattr(session, "doc_collectors", []):
             results.extend(doc_collector.get_all_results())
             doc_collector.write(
-                os.path.join(session.config.getoption("rst_dir"),
-                             doc_collector.node_name + ".rst"))
+                os.path.join(session.config.getoption("rst_dir"), doc_collector.node_name + ".rst")
+            )
 
         # Writes the Overview.rst file.
         result_rst = RstCloth()
         result_rst.title("Test Result Table")
         result_rst.newline()
-        result_rst._add(tabulate([(x['name'], x['setup'], x.get('call', "NOTRUN"), x.get('teardown', "NOTRUN"))
-                                  for x in results],
-                                 headers=RESULTS_HEADER,
-                                 tablefmt='rst'))
+        result_rst._add(
+            tabulate(
+                [
+                    (x["name"], x["setup"], x.get("call", "NOTRUN"), x.get("teardown", "NOTRUN"))
+                    for x in results
+                ],
+                headers=RESULTS_HEADER,
+                tablefmt="rst",
+            )
+        )
         result_rst.newline(2)
-        result_rst.write(os.path.join(session.config.getoption("rst_dir"),
-                                      "overview.rst"))
+        result_rst.write(os.path.join(session.config.getoption("rst_dir"), "overview.rst"))
 
         # Todo: Write a test log data rst.
         # Theoretically, this should let us put it as an appendix in Latext. Having it generate
@@ -635,49 +647,59 @@ def pytest_addoption(parser):
     Add in options for generating docs.
 
     """
-    group = parser.getgroup("RST Writer",
-                            description="RST documentation generator options")
-    group.addoption("--rst-write-index",
-                    help="Write an RST index.rst file",
-                    action="store_true",
-                    default=False, )
-    group.addoption("--rst-title",
-                    help="RST Document Title",
-                    default="Test Documentation",
-                    dest="rst_title")
-    group.addoption("--rst-desc",
-                    help="RST Document description",
-                    dest="rst_desc",
-                    default="Test case results")
-    group.addoption("--rst-dir",
-                    help="Destination directory for generated RST documentation",
-                    default="_docs",
-                    dest="rst_dir")
-    group.addoption("--rst-fixture-results",
-                    help="Force writing of the value of fixture results to the generated RST documentation. Note: this "
-                         "can be enabled on a per-fixture bases with the `@doc_result` decorator",
-                    dest="rst_fixture_results",
-                    action="store_true",
-                    default=False)
-    group.addoption("--rst-include-src",
-                    help="Include source code for the test itself.",
-                    action="store_true",
-                    default=True)
-    group.addoption("--rst-cut-dir",
-                    dest="rst_cut_dir",
-                    help="Trim document node names",
-                    action="store")
-    group.addoption("--rst-label-prefix",
-                    dest="rst_label_prefix",
-                    help="Text to prepend to generated test labels",
-                    action="store",
-                    default="")
+    group = parser.getgroup("RST Writer", description="RST documentation generator options")
+    group.addoption(
+        "--rst-write-index",
+        help="Write an RST index.rst file",
+        action="store_true",
+        default=False,
+        dest="rst_write_index",
+    )
+    group.addoption(
+        "--rst-title",
+        help="RST Document Title. Only takes effect if writing an index.rst",
+        default="Test Documentation",
+        dest="rst_title",
+    )
+    group.addoption(
+        "--rst-desc", help="RST Document description", dest="rst_desc", default="Test case results"
+    )
+    group.addoption(
+        "--rst-dir",
+        help="Destination directory for generated RST documentation",
+        default=None,
+        dest="rst_dir",
+    )
+    group.addoption(
+        "--rst-fixture-results",
+        help="Force writing of the value of fixture results to the generated RST documentation. Note: this "
+        "can be enabled on a per-fixture bases with the `@doc_result` decorator",
+        dest="rst_fixture_results",
+        action="store_true",
+        default=False,
+    )
+    group.addoption(
+        "--rst-include-src",
+        help="Include source code for the test itself.",
+        action="store_true",
+        default=True,
+    )
+    group.addoption(
+        "--rst-cut-dir", dest="rst_cut_dir", help="Trim document node names", action="store"
+    )
+    group.addoption(
+        "--rst-label-prefix",
+        dest="rst_label_prefix",
+        help="Text to prepend to generated test labels",
+        action="store",
+        default="",
+    )
 
 
 def pytest_configure(config):
     if config.getoption("rst_dir"):
-        if os.path.exists(path.join(config.getoption('rst_dir'), "logs")):
-            shutil.rmtree(path.join(config.getoption('rst_dir'), "logs"))
+        if os.path.exists(path.join(config.getoption("rst_dir"), "logs")):
+            shutil.rmtree(path.join(config.getoption("rst_dir"), "logs"))
 
 
 def doc_result(fixture):
