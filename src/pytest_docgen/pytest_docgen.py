@@ -620,9 +620,19 @@ def pytest_sessionfinish(session):
             )
 
         # Writes the Overview.rst file.
-        result_rst = RstCloth()
-        result_rst.title("Test Result Table")
-        result_rst.newline()
+        overview_path = os.path.join(session.config.getoption("rst_dir"), "overview.rst")
+        if os.path.exists(overview_path):
+            # Append to existing overview.
+            with open(overview_path, "r") as existing_overview:
+                overview_data = [x.rstrip() for x in existing_overview.readlines()]
+
+                result_rst = RstCloth()
+                result_rst._data = overview_data
+        else:
+            result_rst = RstCloth()
+            result_rst.title("Test Result Table(s)")
+            result_rst.newline()
+
         result_rst._add(
             tabulate(
                 [
