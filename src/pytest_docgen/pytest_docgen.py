@@ -109,7 +109,7 @@ class NodeDocCollector(object):
         self.log_data = OrderedDict()
         self.capture_start = 0
         self.capture_end = 0
-        self.build_order = DEFAULT_BUILD_ORDER
+        self.build_order = DEFAULT_BUILD_ORDER[:]
         self.generic_sections = {}
         if log_location:
             log_dir = os.path.dirname(self.log_location)
@@ -130,6 +130,8 @@ class NodeDocCollector(object):
         rst.newline(2)
 
     def _build_fixtures(self, rst):
+        if not self._fixtures:
+            return
         rst.directive(
             name="topic", arg="{}{} Preconditions".format(self.level[0].upper(), self.level[1:])
         )
@@ -157,7 +159,8 @@ class NodeDocCollector(object):
         rst.newline()
 
     def _build_source_link(self, rst):
-
+        if not self.source_file:
+            return
         rst.h5("Source Code")
         rst.newline()
         rst.directive("collapsible-block")
@@ -171,6 +174,8 @@ class NodeDocCollector(object):
         rst.newline()
 
     def _build_results(self, rst):
+        if not self._results:
+            return
         res = self.get_simple_results()
 
         table_results = [
@@ -193,6 +198,8 @@ class NodeDocCollector(object):
         rst.newline()
 
     def _build_logs(self, rst):
+        if not self.write_logs:
+            return
         rst.h5("Test Output")
         rst.newline()
 
@@ -246,13 +253,13 @@ class NodeDocCollector(object):
         return rst
 
     def _build_section(self, section, rst):
-        if section == "results" and self._results:
+        if section == "results":
             self._build_results(rst)
-        elif section == "source" and self.source_file:
+        elif section == "source":
             self._build_source_link(rst)
-        elif section == "fixtures" and self._fixtures:
+        elif section == "fixtures":
             self._build_fixtures(rst)
-        elif section == "logs" and self.write_logs:
+        elif section == "logs":
             self._build_logs(rst)
         else:
             self._build_generic(self.generic_sections[section], rst)
