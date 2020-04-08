@@ -5,7 +5,7 @@ setup(
     packages=find_packages("src"),
     package_dir={"": "src"},
     include_package_data=True,
-    version="1.2.1",
+    version="1.3.0",
     description="An RST Documentation Generator for pytest-based test suites",
     maintainer="Ashley Straw",
     maintainer_email="as.fireflash38@gmail.com",
