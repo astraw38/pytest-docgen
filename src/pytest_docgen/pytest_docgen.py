@@ -6,7 +6,7 @@
 
 """
 import os
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 
 import pytest
 import inspect
@@ -36,6 +36,9 @@ from tabulate import tabulate
 
 SESSION_HEADER_MAP = {"session": "h1", "module": "h2", "class": "h3", "function": "h4"}
 RESULTS_HEADER = ["Test Name", "Setup", "Call", "Teardown"]
+DEFAULT_BUILD_ORDER = ["fixtures", "results", "source", "logs"]
+
+Section = namedtuple("Section", ["title", "content"])
 
 
 def _pop_top_dir(path):
@@ -106,6 +109,8 @@ class NodeDocCollector(object):
         self.log_data = OrderedDict()
         self.capture_start = 0
         self.capture_end = 0
+        self.build_order = DEFAULT_BUILD_ORDER
+        self.generic_sections = {}
         if log_location:
             log_dir = os.path.dirname(self.log_location)
             os.makedirs(log_dir, exist_ok=True)
@@ -232,22 +237,39 @@ class NodeDocCollector(object):
         rst.content(doc_prep(self.node_doc))
         rst.newline()
 
-        if self._results:
-            self._build_results(rst)
-
-        if self.source_file:
-            self._build_source_link(rst)
-
-        if self._fixtures:
-            self._build_fixtures(rst)
-
-        if self.write_logs:
-            self._build_logs(rst)
+        for item in self.build_order:
+            self._build_section(item, rst)
 
         for subdoc in self.children:
             rst._add(subdoc.emit())
             rst.newline(2)
         return rst
+
+    def _build_section(self, section, rst):
+        if section == "results" and self._results:
+            self._build_results(rst)
+        elif section == "source" and self.source_file:
+            self._build_source_link(rst)
+        elif section == "fixtures" and self._fixtures:
+            self._build_fixtures(rst)
+        elif section == "logs" and self.write_logs:
+            self._build_logs(rst)
+        else:
+            self._build_generic(self.generic_sections[section], rst)
+
+    def _build_generic(self, section, rst):
+        rst.newline()
+        rst.h5(section.title)
+        rst.newline()
+        rst.content(section.content)
+        rst.newline()
+
+    def add_section(self, name, section, loc=None):
+        self.generic_sections[name] = section
+        if loc is None:
+            self.build_order.append(name)
+        else:
+            self.build_order.insert(loc, name)
 
     def emit(self):
         """
