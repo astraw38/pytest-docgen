@@ -278,6 +278,16 @@ class NodeDocCollector(object):
         else:
             self.build_order.insert(loc, name)
 
+    def has_section(self, name):
+        return name in self.generic_sections
+
+    def get_section(self, name, default=None):
+        return self.generic_sections.get(name, default)
+
+    def append_to_section(self, name, content):
+        if self.has_section(name):
+            self.generic_sections[name] = self.generic_sections[name] + content
+
     def emit(self):
         """
         Return internal *raw-string* representation of this node's rst doc
