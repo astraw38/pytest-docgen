@@ -342,6 +342,8 @@ class NodeDocCollector(object):
 
         # Module or Class DocCollectors don't have a log location set, however they
         # *also* don't have a result to add. So this is safe... for now.
+        if not os.path.exists(os.path.dirname(self.log_location)):
+            os.mkdir(os.path.dirname(self.log_location))
         with open("{}.log".format(self.log_location), "a+") as log:
             # Seek to end of file.
             log.seek(0)
