@@ -18,7 +18,6 @@ from _pytest.main import Session
 from _pytest.python import Instance
 from os import path
 
-import attr
 from rstcloth.rstcloth import RstCloth
 
 try:
@@ -39,12 +38,6 @@ from tabulate import tabulate
 SESSION_HEADER_MAP = {"session": "h1", "module": "h2", "class": "h3", "function": "h4"}
 RESULTS_HEADER = ["Test Name", "Setup", "Call", "Teardown"]
 DEFAULT_BUILD_ORDER = ["fixtures", "results", "source", "logs"]
-
-@attr.s
-class DocSection:
-    title = attr.ib()
-    content = attr.ib(converter=list)
-
 
 
 def _pop_top_dir(path):
@@ -268,17 +261,17 @@ class NodeDocCollector(object):
         elif section == "logs":
             self._build_logs(rst)
         else:
-            self._build_generic(self.generic_sections[section], rst)
+            self._build_generic(section, self.generic_sections[section], rst)
 
-    def _build_generic(self, section, rst):
+    def _build_generic(self, name, content, rst):
         rst.newline()
-        rst.h5(section.title)
+        rst.h5(name)
         rst.newline()
-        rst.content(section.content)
+        rst.content(content)
         rst.newline()
 
-    def add_section(self, name, section, loc=None):
-        self.generic_sections[name] = section
+    def add_section(self, name, content, loc=None):
+        self.generic_sections[name] = content
         if loc is None:
             self.build_order.append(name)
         else:
@@ -292,7 +285,7 @@ class NodeDocCollector(object):
 
     def append_to_section(self, name, content):
         if self.has_section(name):
-            self.generic_sections[name] = self.generic_sections[name].content + content
+            self.generic_sections[name] += content
 
     def emit(self):
         """

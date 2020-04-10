@@ -1,7 +1,4 @@
 import pytest
-from collections import namedtuple
-
-from pytest_docgen.pytest_docgen import DocSection
 
 
 def doc_generic(funcarg, funcval):
@@ -9,19 +6,21 @@ def doc_generic(funcarg, funcval):
 
 
 @pytest.hookimpl(hookwrapper=True)
-def pytest_fixture_setup(fixturedef, request):
-    outcome = yield
+def pytest_runtest_call(item):
     # If we're using pytest-docgen, we'll have a doc collector
+    func_args = item.funcargs
     try:
-        if hasattr(request.node, "_doccol"):
-            doccol = request.node._doccol
-            doccol.add_section(
-                "preconditions",
-                DocSection("Parameters", doc_generic(fixturedef.argname, outcome.get_result())),
-            )
-    except Exception:
+        if hasattr(item, "_doccol"):
+            doccol = item._doccol
+            for fixture, funcval in func_args.items():
+                if doccol.has_section("Parameters"):
+                    doccol.append_to_section("Parameters", doc_generic(fixture, funcval))
+                else:
+                    doccol.add_section("Parameters", doc_generic(fixture, funcval), loc=1)
+    except Exception as exc:
         # failed to add doc section.
         raise
+    yield
 
 
 @pytest.fixture(scope="module")
@@ -29,12 +28,6 @@ def module_fixture(request):
     """
     Module fixture in use!
     """
-
-    if hasattr(request.node, "_doccol"):
-        doccol = request.node._doccol
-        doccol.add_section(
-            "preconditions",
-            DocSection("Parameters", [":module_fixture: Module"])),
     yield "Module"
 
 
@@ -51,7 +44,7 @@ def func_fixture():
     """
     Function fixture in use!"
     """
-    yield
+    yield "Function"
 
 
 @pytest.fixture()
@@ -74,13 +67,13 @@ def test_failing_module_level():
 
 
 class TestClass:
-    def test_passing_class_level(self, class_fixture):
+    def test_passing_class_level(self, class_fixture, module_fixture):
         """
         This is a passing class-level test.
         """
         pass
 
-    def test_failing_class_level(self):
+    def test_failing_class_level(self, func_fixture):
         """
         This is a failing class-level test.
         """
