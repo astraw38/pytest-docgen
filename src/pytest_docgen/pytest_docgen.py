@@ -17,6 +17,8 @@ import re
 from _pytest.main import Session
 from _pytest.python import Instance
 from os import path
+
+import attr
 from rstcloth.rstcloth import RstCloth
 
 try:
@@ -38,7 +40,11 @@ SESSION_HEADER_MAP = {"session": "h1", "module": "h2", "class": "h3", "function"
 RESULTS_HEADER = ["Test Name", "Setup", "Call", "Teardown"]
 DEFAULT_BUILD_ORDER = ["fixtures", "results", "source", "logs"]
 
-Section = namedtuple("Section", ["title", "content"])
+@attr.s
+class DocSection:
+    title = attr.ib()
+    content = attr.ib(converter=list)
+
 
 
 def _pop_top_dir(path):
@@ -286,7 +292,7 @@ class NodeDocCollector(object):
 
     def append_to_section(self, name, content):
         if self.has_section(name):
-            self.generic_sections[name] = self.generic_sections[name] + content
+            self.generic_sections[name] = self.generic_sections[name].content + content
 
     def emit(self):
         """

@@ -1,13 +1,11 @@
 import pytest
 from collections import namedtuple
 
-Section = namedtuple("Section", ["title", "content"])
+from pytest_docgen.pytest_docgen import DocSection
 
 
 def doc_generic(funcarg, funcval):
-    return """
-    :param {}: {}
-""".format(funcarg, funcval)
+    return [":{}: {}".format(funcarg, funcval)]
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -19,7 +17,7 @@ def pytest_fixture_setup(fixturedef, request):
             doccol = request.node._doccol
             doccol.add_section(
                 "preconditions",
-                Section("Parameters", doc_generic(fixturedef.argname, outcome.get_result())),
+                DocSection("Parameters", doc_generic(fixturedef.argname, outcome.get_result())),
             )
     except Exception:
         # failed to add doc section.
@@ -36,9 +34,7 @@ def module_fixture(request):
         doccol = request.node._doccol
         doccol.add_section(
             "preconditions",
-            Section("Parameters", """
-    :param module_fixture: Module
-    """)),
+            DocSection("Parameters", [":module_fixture: Module"])),
     yield "Module"
 
 

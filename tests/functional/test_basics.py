@@ -116,7 +116,7 @@ class TestDocgenOptions:
 
         with open(os.path.join(loc, "_docs", test_rst_file)) as f:
             data = f.read()
-        assert ":param module_fixture: Module" in data
+        assert ":module_fixture: Module" in data
 
     def test_logging(self, testdir, logging_file):
         testdir.makepyfile(logging_file)
