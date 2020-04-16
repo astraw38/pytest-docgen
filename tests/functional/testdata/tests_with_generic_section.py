@@ -5,22 +5,22 @@ def doc_generic(funcarg, funcval):
     return [":{}: {}".format(funcarg, funcval)]
 
 
-@pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_call(item):
-    # If we're using pytest-docgen, we'll have a doc collector
-    func_args = item.funcargs
-    try:
-        if hasattr(item, "_doccol"):
-            doccol = item._doccol
-            for fixture, funcval in func_args.items():
-                if doccol.has_section("Parameters"):
-                    doccol.append_to_section("Parameters", doc_generic(fixture, funcval))
-                else:
-                    doccol.add_section("Parameters", doc_generic(fixture, funcval), loc=1)
-    except Exception as exc:
-        # failed to add doc section.
-        raise
-    yield
+# @pytest.hookimpl(hookwrapper=True)
+# def pytest_runtest_call(item):
+#     # If we're using pytest-docgen, we'll have a doc collector
+#     func_args = item.funcargs
+#     try:
+#         if hasattr(item, "_doccol"):
+#             doccol = item._doccol
+#             for fixture, funcval in func_args.items():
+#                 if doccol.has_section("Parameters"):
+#                     doccol.append_to_section("Parameters", doc_generic(fixture, funcval))
+#                 else:
+#                     doccol.add_section("Parameters", doc_generic(fixture, funcval), loc=1)
+#     except Exception as exc:
+#         # failed to add doc section.
+#         raise
+#     yield
 
 
 @pytest.fixture(scope="module")
@@ -28,6 +28,11 @@ def module_fixture(request):
     """
     Module fixture in use!
     """
+    if hasattr(request.node, "_doccol"):
+        doccol = request.node._doccol
+        doccol.add_section(
+            "Parameters",
+            [":module_fixture: Module"]),
     yield "Module"
 
 

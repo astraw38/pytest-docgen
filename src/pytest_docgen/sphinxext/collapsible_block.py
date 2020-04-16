@@ -141,3 +141,5 @@ def setup(app):
 
     app.add_javascript("collapsible_block.js")
     app.add_stylesheet("collapsible_block.css")
+
+    return {"parallel_read_safe": True, "parallel_write_safe": True}
