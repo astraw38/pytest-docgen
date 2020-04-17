@@ -6,7 +6,7 @@
 
 """
 import os
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 
 import pytest
 import inspect
@@ -17,6 +17,7 @@ import re
 from _pytest.main import Session
 from _pytest.python import Instance
 from os import path
+
 from rstcloth.rstcloth import RstCloth
 
 try:
@@ -36,6 +37,7 @@ from tabulate import tabulate
 
 SESSION_HEADER_MAP = {"session": "h1", "module": "h2", "class": "h3", "function": "h4"}
 RESULTS_HEADER = ["Test Name", "Setup", "Call", "Teardown"]
+DEFAULT_BUILD_ORDER = ["fixtures", "results", "source", "logs"]
 
 
 def _pop_top_dir(path):
@@ -106,6 +108,8 @@ class NodeDocCollector(object):
         self.log_data = OrderedDict()
         self.capture_start = 0
         self.capture_end = 0
+        self.build_order = DEFAULT_BUILD_ORDER[:]
+        self.generic_sections = {}
         if log_location:
             log_dir = os.path.dirname(self.log_location)
             os.makedirs(log_dir, exist_ok=True)
@@ -125,6 +129,8 @@ class NodeDocCollector(object):
         rst.newline(2)
 
     def _build_fixtures(self, rst):
+        if not self._fixtures:
+            return
         rst.directive(
             name="topic", arg="{}{} Preconditions".format(self.level[0].upper(), self.level[1:])
         )
@@ -152,7 +158,8 @@ class NodeDocCollector(object):
         rst.newline()
 
     def _build_source_link(self, rst):
-
+        if not self.source_file:
+            return
         rst.h5("Source Code")
         rst.newline()
         rst.directive("collapsible-block")
@@ -166,6 +173,8 @@ class NodeDocCollector(object):
         rst.newline()
 
     def _build_results(self, rst):
+        if not self._results:
+            return
         res = self.get_simple_results()
 
         table_results = [
@@ -188,6 +197,8 @@ class NodeDocCollector(object):
         rst.newline()
 
     def _build_logs(self, rst):
+        if not self.write_logs:
+            return
         rst.h5("Test Output")
         rst.newline()
 
@@ -232,22 +243,49 @@ class NodeDocCollector(object):
         rst.content(doc_prep(self.node_doc))
         rst.newline()
 
-        if self._results:
-            self._build_results(rst)
-
-        if self.source_file:
-            self._build_source_link(rst)
-
-        if self._fixtures:
-            self._build_fixtures(rst)
-
-        if self.write_logs:
-            self._build_logs(rst)
+        for item in self.build_order:
+            self._build_section(item, rst)
 
         for subdoc in self.children:
             rst._add(subdoc.emit())
             rst.newline(2)
         return rst
+
+    def _build_section(self, section, rst):
+        if section == "results":
+            self._build_results(rst)
+        elif section == "source":
+            self._build_source_link(rst)
+        elif section == "fixtures":
+            self._build_fixtures(rst)
+        elif section == "logs":
+            self._build_logs(rst)
+        else:
+            self._build_generic(section, self.generic_sections[section], rst)
+
+    def _build_generic(self, name, content, rst):
+        rst.newline()
+        rst.h5(name)
+        rst.newline()
+        rst.content(content)
+        rst.newline()
+
+    def add_section(self, name, content, loc=None):
+        self.generic_sections[name] = content
+        if loc is None:
+            self.build_order.append(name)
+        else:
+            self.build_order.insert(loc, name)
+
+    def has_section(self, name):
+        return name in self.generic_sections
+
+    def get_section(self, name, default=None):
+        return self.generic_sections.get(name, default)
+
+    def append_to_section(self, name, content):
+        if self.has_section(name):
+            self.generic_sections[name] += content
 
     def emit(self):
         """
@@ -303,6 +341,8 @@ class NodeDocCollector(object):
 
         # Module or Class DocCollectors don't have a log location set, however they
         # *also* don't have a result to add. So this is safe... for now.
+        if not os.path.exists(os.path.dirname(self.log_location)):
+            os.mkdir(os.path.dirname(self.log_location))
         with open("{}.log".format(self.log_location), "a+") as log:
             # Seek to end of file.
             log.seek(0)
