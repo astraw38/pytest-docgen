@@ -1,5 +1,7 @@
 import logging
+
 log = logging.getLogger(__name__)
+
 
 def test_passing_module_level():
     """

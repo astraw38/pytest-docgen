@@ -30,9 +30,7 @@ def module_fixture(request):
     """
     if hasattr(request.node, "_doccol"):
         doccol = request.node._doccol
-        doccol.add_section(
-            "Parameters",
-            [":module_fixture: Module"]),
+        doccol.add_section("Parameters", [":module_fixture: Module"]),
     yield "Module"
 
 

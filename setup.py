@@ -13,7 +13,7 @@ setup(
     author_email="as.fireflash38@gmail.com",
     keywords=["pytest", "sphinx", "rst", "testing"],
     url="https://github.com/astraw38/pytest-docgen",
-    download_url="https://github.com/astraw38/pytest-docgen/tarball/v1.2.1/",
+    download_url="https://github.com/astraw38/pytest-docgen/tarball/v1.3.0/",
     # the following makes a plugin available to pytest
     entry_points={"pytest11": ["pytest_docgen = pytest_docgen.pytest_docgen",],},
     # custom PyPI classifier for pytest plugins

@@ -18,6 +18,7 @@ def fixture_file():
         data = f.read()
     yield data
 
+
 @pytest.fixture(scope="module")
 def generic_file():
     with open("testdata/tests_with_generic_section.py", "r") as f:
@@ -105,7 +106,7 @@ class TestDocgenOptions:
 
     def test_rst_with_added_section(self, testdir, generic_file):
         testdir.makepyfile(generic_file)
-        result = testdir.runpytest_inprocess("--rst-dir=_docs", )
+        result = testdir.runpytest_inprocess("--rst-dir=_docs",)
         result.assert_outcomes(3, 0, 2, 1)
 
         # note: pytester makes a test file w/ the unittest name as the name of the file.
