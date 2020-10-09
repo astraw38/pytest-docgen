@@ -119,7 +119,7 @@ class TestDocgenOptions:
     @pytest.mark.xfail(reason="Need to sort out why logging not showing up in output")
     def test_logging(self, testdir, logging_file):
         testdir.makepyfile(logging_file)
-        result = testdir.runpytest_inprocess("--rst-dir=_docs")
+        result = testdir.runpytest_inprocess("--rst-dir=_docs", "-o log_level=INFO")
         result.assert_outcomes(2, 0, 2)
 
         # note: pytester makes a test file w/ the unittest name as the name of the file.

@@ -7,6 +7,7 @@
 """
 import os
 from collections import OrderedDict, namedtuple
+from distutils.version import LooseVersion
 
 import pytest
 import inspect
@@ -19,6 +20,9 @@ from _pytest.python import Instance
 from os import path
 
 from rstcloth.rstcloth import RstCloth
+
+# Todo: pytest 3.6+: get caplog some other way?
+PYTEST_NEW_CAPLOG = LooseVersion(pytest.__version__) > "5.0.0"
 
 try:
     from _pytest.python import Package
@@ -605,25 +609,55 @@ def pytest_runtest_makereport(item, call):
             doccol.add_capture(capstdout=res.capstdout, capstderr=res.capstderr)
 
 
-@pytest.hookimpl(hookwrapper=True)
+@pytest.hookimpl(hookwrapper=True, trylast=True)
 def pytest_runtest_setup(item):
     yield
     if item.session.config.getoption("rst_dir"):
-        item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(), "setup")
+        if PYTEST_NEW_CAPLOG:
+            log_data = "".join(
+                [
+                    log
+                    for when, section, log in item._report_sections
+                    if when == "setup" and section == "log"
+                ]
+            )
+        else:
+            log_data = item.catch_log_handler.stream.getvalue()
+        item._doccol.add_logdata(log_data, "setup")
 
 
-@pytest.hookimpl(hookwrapper=True)
+@pytest.hookimpl(hookwrapper=True, trylast=True)
 def pytest_runtest_call(item):
     yield
     if item.session.config.getoption("rst_dir"):
-        item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(), "call")
+        if PYTEST_NEW_CAPLOG:
+            log_data = "".join(
+                [
+                    log
+                    for when, section, log in item._report_sections
+                    if when == "call" and section == "log"
+                ]
+            )
+        else:
+            log_data = item.catch_log_handler.stream.getvalue()
+        item._doccol.add_logdata(log_data, "call")
 
 
-@pytest.hookimpl(hookwrapper=True)
+@pytest.hookimpl(hookwrapper=True, trylast=True)
 def pytest_runtest_teardown(item):
     yield
     if item.session.config.getoption("rst_dir"):
-        item._doccol.add_logdata(item.catch_log_handler.stream.getvalue(), "teardown")
+        if PYTEST_NEW_CAPLOG:
+            log_data = "".join(
+                [
+                    log
+                    for when, section, log in item._report_sections
+                    if when == "teardown" and section == "log"
+                ]
+            )
+        else:
+            log_data = item.catch_log_handler.stream.getvalue()
+        item._doccol.add_logdata(log_data, "teardown")
 
 
 def pytest_sessionstart(session):
