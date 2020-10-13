@@ -1,0 +1,16 @@
+language: python
+python:
+  - "3.6"
+  - "3.7"
+  - "3.8"
+dist: xenial
+sudo: true
+env:
+  - PYTEST=3.*
+  - PYTEST=4.*
+  - PYTEST=5.*
+  - PYTEST=6.*
+install:
+  - "pip install -q pytest==$PYTEST"
+  - "pip install -q -e ."
+script: "pytest tests/"
